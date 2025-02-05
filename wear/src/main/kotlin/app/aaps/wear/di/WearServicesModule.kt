@@ -2,6 +2,8 @@ package app.aaps.wear.di
 
 import app.aaps.wear.comm.DataLayerListenerServiceWear
 import app.aaps.wear.complications.BaseComplicationProviderService
+import app.aaps.wear.complications.BrIobComplication
+import app.aaps.wear.complications.BrComplication
 import app.aaps.wear.complications.BrCobIobComplication
 import app.aaps.wear.complications.CobDetailedComplication
 import app.aaps.wear.complications.CobIconComplication
@@ -16,6 +18,7 @@ import app.aaps.wear.complications.UploaderBatteryComplication
 import app.aaps.wear.complications.WallpaperComplication
 import app.aaps.wear.heartrate.HeartRateListener
 import app.aaps.wear.tile.ActionsTileService
+import app.aaps.wear.tile.LoopStateTileService
 import app.aaps.wear.tile.QuickWizardTileService
 import app.aaps.wear.tile.TempTargetTileService
 import app.aaps.wear.tile.TileBase
@@ -37,6 +40,8 @@ abstract class WearServicesModule {
     @ContributesAndroidInjector abstract fun contributesStepsCountListenerService(): StepCountListener
     @ContributesAndroidInjector abstract fun contributesBaseComplicationProviderService(): BaseComplicationProviderService
     @ContributesAndroidInjector abstract fun contributesBrCobIobComplication(): BrCobIobComplication
+    @ContributesAndroidInjector abstract fun contributesBrIobComplication(): BrIobComplication
+    @ContributesAndroidInjector abstract fun contributesBrComplication(): BrComplication
     @ContributesAndroidInjector abstract fun contributesCobDetailedComplication(): CobDetailedComplication
     @ContributesAndroidInjector abstract fun contributesCobIconComplication(): CobIconComplication
     @ContributesAndroidInjector abstract fun contributesCobIobComplication(): CobIobComplication
@@ -59,5 +64,6 @@ abstract class WearServicesModule {
     @ContributesAndroidInjector abstract fun contributesUserActionTileService(): UserActionTileService
     @ContributesAndroidInjector abstract fun contributesTempTargetTileService(): TempTargetTileService
     @ContributesAndroidInjector abstract fun contributesActionsTileService(): ActionsTileService
+    @ContributesAndroidInjector abstract fun contributesLoopStateTileService(): LoopStateTileService
 
 }
