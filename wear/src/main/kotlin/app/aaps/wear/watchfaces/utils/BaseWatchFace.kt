@@ -202,10 +202,16 @@ abstract class BaseWatchFace : WatchFace() {
         }
     }
 
+ //   open fun changeChartTimeframe() {
+ //       var timeframe = sp.getInt(R.string.key_chart_time_frame, 3)
+ //       timeframe = timeframe % 5 + 1
+ //       sp.putString(R.string.key_chart_time_frame, timeframe.toString())
+ //   }
+
     open fun changeChartTimeframe() {
-        var timeframe = sp.getInt(R.string.key_chart_time_frame, 3)
-        timeframe = timeframe % 5 + 1
-        sp.putString(R.string.key_chart_time_frame, timeframe.toString())
+        val currentFrame = sp.getInt(R.string.key_chart_time_frame, 2)
+        val newFrame = if (currentFrame == 2) 6 else 2
+        sp.putString(R.string.key_chart_time_frame, newFrame.toString())
     }
 
     override fun getWatchFaceStyle(): WatchFaceStyle {

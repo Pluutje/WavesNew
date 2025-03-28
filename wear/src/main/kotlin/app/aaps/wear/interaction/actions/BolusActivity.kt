@@ -34,9 +34,9 @@ class BolusActivity : ViewSelectorActivity() {
         override fun getColumnCount(arg0: Int): Int = 2
         override fun getRowCount(): Int = 1
 
-        val increment1 = (preferences.get(DoubleKey.OverviewInsulinButtonIncrement1) * 10).roundToInt() / 10.0
-        val increment2 = (preferences.get(DoubleKey.OverviewInsulinButtonIncrement2) * 10).roundToInt() / 10.0
-        val stepValues = listOf(0.1, increment1, increment2)
+        val increment1 = (preferences.get(DoubleKey.OverviewInsulinButtonIncrement1) * 20).roundToInt() / 20.0
+        val increment2 = (preferences.get(DoubleKey.OverviewInsulinButtonIncrement2) * 20).roundToInt() / 20.0
+        val stepValues = listOf(0.05, increment1, increment2)
 
         override fun instantiateItem(container: ViewGroup, row: Int, col: Int): View = when (col) {
             0    -> {
@@ -44,7 +44,7 @@ class BolusActivity : ViewSelectorActivity() {
                 val initValue = SafeParse.stringToDouble(editInsulin?.editText?.text.toString(), 0.0)
                 val maxBolus = sp.getDouble(getString(R.string.key_treatments_safety_max_bolus), 3.0)
                 val title = getString(R.string.action_insulin_units)
-                editInsulin = PlusMinusEditText(viewAdapter, initValue, 0.0, maxBolus, stepValues, DecimalFormat("#0.0"), false, title)
+                editInsulin = PlusMinusEditText(viewAdapter, initValue, 0.0, maxBolus, stepValues, DecimalFormat("#0.00"), false, title)
                 val view = viewAdapter.root
                 container.addView(view)
                 view.requestFocus()
