@@ -52,4 +52,13 @@ enum class StringKey(
     TidepoolPassword("tidepool_password", "", isPassword = true),
     TidepoolTestLogin(key = "tidepool_test_login", ""),
     GarminRequestKey(key = "garmin_aaps_key", defaultValue = ""),
+
+    // eigen
+    OchtendStart(key = "OchtendStart", "06:30"),
+    OchtendStartWeekend(key = "OchtendStartWeekend", "08:00"),
+    NachtStart(key = "NachtStart", "23:30"),
+    WeekendDagen(key = "WeekendDagen", "za,zo"),
+    ApsWaveStartTijd(key = "ApsWaveStartTijd", "06:30"),
+    ApsWaveStartTijdWeekend(key = "ApsWaveStartTijdWeekend", "06:30"),
+    ApsWaveEndTijd(key = "ApsWaveEndTijd", "23:30"),
 }

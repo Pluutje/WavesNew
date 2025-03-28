@@ -2,6 +2,7 @@ package app.aaps.ui.dialogs
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Environment
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -49,12 +50,19 @@ import com.google.common.base.Joiner
 import dagger.android.HasAndroidInjector
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
+import java.io.File
+import java.io.IOException
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.text.DecimalFormat
 import java.util.LinkedList
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.max
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class InsulinDialog : DialogFragmentWithDate() {
 
@@ -78,6 +86,12 @@ class InsulinDialog : DialogFragmentWithDate() {
     private var queryingProtection = false
     private val disposable = CompositeDisposable()
     private var _binding: DialogInsulinBinding? = null
+    private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
+    private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
+    private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
+    private val BolusOverzicht = File(externalDir, "ANALYSE/BolusOverzicht.txt")
+
+
 
     // This property is only valid between onCreateView and onDestroyView.
     private val binding get() = _binding!!
@@ -134,14 +148,28 @@ class InsulinDialog : DialogFragmentWithDate() {
             binding.recordOnly.isChecked = true
             binding.recordOnly.isEnabled = false
             binding.recordOnly.setTextColor(rh.gac(app.aaps.core.ui.R.attr.warningColor))
-            binding.header.setBackgroundColor(rh.gac(app.aaps.core.ui.R.attr.ribbonWarningColor))
-            binding.headerText.setTextColor(rh.gac(app.aaps.core.ui.R.attr.ribbonTextWarningColor))
+            //    binding.header.setBackgroundColor(rh.gac(app.aaps.core.ui.R.attr.ribbonWarningColor))
+            //    binding.headerText.setTextColor(rh.gac(app.aaps.core.ui.R.attr.ribbonTextWarningColor))
         }
 
         binding.time.setParams(
             savedInstanceState?.getDouble("time")
                 ?: 0.0, -12 * 60.0, 12 * 60.0, 5.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
         )
+        binding.tijd.setParams(
+            savedInstanceState?.getDouble("tijd")
+                ?: 100.0, 20.0, 240.0, 10.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
+        )
+        binding.percentage.setParams(
+            savedInstanceState?.getDouble("percentage")
+                ?:225.0, 50.0, 500.0, 25.0, DecimalFormat("0"), true, binding.okcancel.ok, textWatcher
+        )
+        binding.tijdbasaal.setParams(
+            savedInstanceState?.getDouble("tijdbasaal")
+                ?: 25.0, 5.0, 60.0, 5.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
+        )
+
+
         binding.amount.setParams(
             savedInstanceState?.getDouble("amount")
                 ?: 0.0, 0.0, maxInsulin, activePlugin.activePump.pumpDescription.bolusStep, decimalFormatter.pumpSupportedBolusFormat(activePlugin.activePump.pumpDescription.bolusStep),
@@ -173,6 +201,20 @@ class InsulinDialog : DialogFragmentWithDate() {
             binding.amount.announceValue()
         }
 
+        binding.timeLayout.visibility = View.GONE
+        binding.recordOnly.setOnCheckedChangeListener { _, isChecked: Boolean ->
+            binding.timeLayout.visibility = isChecked.toVisibility()
+        }
+        binding.tijdLayout.visibility = View.VISIBLE //View.GONE
+        binding.percentageLayout.visibility = View.VISIBLE //View.GONE
+
+        binding.tijdbasaalLayout.visibility = View.VISIBLE
+        binding.uitgesteldbasaalLayout.visibility = View.VISIBLE
+
+        binding.insulinLabel.labelFor = binding.amount.editTextId
+        binding.timeLabel.labelFor = binding.time.editTextId
+
+
         if (!binding.recordOnly.isChecked) {
             binding.timeLayout.visibility = View.GONE
         }
@@ -192,13 +234,58 @@ class InsulinDialog : DialogFragmentWithDate() {
     override fun submit(): Boolean {
         if (_binding == null) return false
         val pumpDescription = activePlugin.activePump.pumpDescription
-        val insulin = SafeParse.stringToDouble(binding.amount.text)
-        val insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(insulin, aapsLogger)).value()
+        var insulin = SafeParse.stringToDouble(binding.amount.text)
+        var insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(insulin, aapsLogger)).value()
         val actions: LinkedList<String?> = LinkedList()
         val units = profileFunction.getUnits()
         val unitLabel = if (units == GlucoseUnit.MMOL) rh.gs(app.aaps.core.ui.R.string.mmol) else rh.gs(app.aaps.core.ui.R.string.mgdl)
         val recordOnlyChecked = binding.recordOnly.isChecked
         val eatingSoonChecked = binding.startEatingSoonTt.isChecked
+
+        // Eigen input
+        val extraInsulineChecked = binding.activeerExtraInsuline.isChecked
+        val bolusviabasaalChecked = binding.bolusViaBasaal.isChecked
+        val alleenBoostChecked = binding.geenBolus.isChecked
+        val StopBolusChecked = binding.stopBolus.isChecked
+        val tijdbolusbasaal = (binding.tijdbasaal.value.toInt()).toString()
+        val tijdExtraInsuline = (binding.tijd.value.toInt()).toString()
+        val percentageExtraInsuline = (binding.percentage.value.toInt()).toString()
+        val tijdNu =  (System.currentTimeMillis() / (60 * 1000)).toString()
+        val insuline = insulinAfterConstraints.toString()
+        //  val path = File(Environment.getExternalStorageDirectory().toString())
+        //  val file = File(path, "Documents/AAPS/ANALYSE/Act-extra-ins.txt")
+        //  val filebasaal = File(path, "Documents/AAPS/ANALYSE/Bolus-via-basaal.txt")
+
+        if (extraInsulineChecked){
+            ActExtraIns.writeText("checked" + "\n" + tijdNu + "\n" + tijdExtraInsuline + "\n" + percentageExtraInsuline)
+        } else {
+            ActExtraIns.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdExtraInsuline + "\n" + percentageExtraInsuline)
+        }
+        if (StopBolusChecked) {
+            ActExtraIns.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdExtraInsuline + "\n" + percentageExtraInsuline)
+        }
+
+
+        if (alleenBoostChecked)  {
+            insulin = 0.0
+            insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(insulin, aapsLogger)).value()
+        }
+
+        if (bolusviabasaalChecked && insulin > 0.0) {
+            insulin = 0.0
+            insulinAfterConstraints = 0.0
+
+            BolusViaBasaal.writeText("checked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+            schrijfBolusOverzicht(tijdNu, insuline)
+        } else {
+            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+        }
+
+        if (StopBolusChecked) {
+            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+        }
+// Einde eigen input
+
 
         if (insulinAfterConstraints > 0) {
             actions.add(
@@ -288,11 +375,69 @@ class InsulinDialog : DialogFragmentWithDate() {
                     }
                 })
             }
-        } else
-            activity?.let { activity ->
-                OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), rh.gs(app.aaps.core.ui.R.string.no_action_selected))
+        } else {
+
+            if (bolusviabasaalChecked && !alleenBoostChecked && !StopBolusChecked) {
+                activity?.let { activity ->
+                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Bolus wordt gegeven via basaal ")
+                }
+            } else {
+                if (alleenBoostChecked || StopBolusChecked) {
+                    if (alleenBoostChecked) {
+                        activity?.let { activity ->
+                            OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Geen Bolus, uitsluitend boost")
+                        }
+                    } else {
+                        activity?.let { activity ->
+                            OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Stop Bolus en Boost")
+                        }
+
+                    }
+                } else {
+                    activity?.let { activity ->
+                        OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), rh.gs(app.aaps.core.ui.R.string.no_action_selected))
+                    }
+                }
             }
+        }
         return true
+    }
+
+    fun schrijfBolusOverzicht(tijdNu: String, insuline: String) {
+        val kopregel = "DatumTijd - Bolus"
+        val tijdact = getFormattedTime()
+        val nieuweRegel = "$tijdact - $insuline eh"
+
+        val file = BolusOverzicht
+
+        if (!file.exists()) {
+            // Bestand maken en kopregel + eerste regel schrijven
+            file.writeText("$kopregel\n$nieuweRegel\n")
+        } else {
+            // Lees de bestaande inhoud
+            var regels = file.readLines().toMutableList()
+
+            // Zorg dat de kopregel correct is
+            if (regels.isEmpty() || regels[0] != kopregel) {
+                regels.add(0, kopregel) // Voeg kopregel toe als deze ontbreekt
+            }
+
+            // Voeg de nieuwe regel direct na de kopregel toe
+            regels.add(1, nieuweRegel)
+
+            // **Beperk de totale regels tot maximaal 40 (inclusief kopregel)**
+            if (regels.size > 40) {
+                regels = regels.subList(0, 40) // Houd alleen de eerste 40 regels
+            }
+
+            // Schrijf alles opnieuw naar het bestand
+            file.writeText(regels.joinToString("\n"))
+        }
+    }
+
+    fun getFormattedTime(): String {
+        val dateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault())
+        return dateFormat.format(Date()) // Huidige tijd in het gewenste formaat
     }
 
     override fun onResume() {

@@ -255,4 +255,102 @@
     <string name="openapsama_iob_threshold_percent_summary" formatted="false">Percentage of maxIOB above which SMBs are disabled.\nDefault value: 100%\nWith 100% this feature is effectively disabled.</string>
     <string name="openapsama_iob_threshold_percent">maxIOB threshold percent for SMB\n(iob_threshold_percent)</string>
 
+    <!--    Eigen -->
+
+
+    <string name="word_handleiding" translatable="false">https://docs.google.com/document/d/10eMqlDauQ3wXd2hGQZeS8TalywemnLy2/edit</string>
+    <string name="Info_doc1">!! Klik om te openen !!\n Inleiding \n Dit document geeft de basisuitleg over het AUTO-SMB algortime</string>
+    <string name="Info_doc2">!! Klik om te openen !!\n Document2 info</string>
+    <string name="Info_doc3">!! Klik om te openen !!\n Document3 info</string>
+    <string name="www_doc1" translatable="false">https://docs.google.com/document/d/10eMqlDauQ3wXd2hGQZeS8TalywemnLy2/edit</string>
+    <string name="www_doc2" translatable="false">https://docs.google.com/document/d/11iVBrEsWRzGgb2BLANFEtZkZVln3K6tE/edit</string>
+    <string name="www_doc3" translatable="false">https://docs.google.com/document/d/11jK2-0Cu5xAN38g4NLKHnWjwySfCbkKD/edit</string>
+
+
+
+    <string name="Info_Bg">1. Dynamische Bg: \n ● correctie sterkte instelbaar tussen 75% en 125%. \n 2. Persistent hoge Bg: \n ● Drempelwaarde waaronder nooit een persitent hoge Bg wordt gedetecteerd \n ● Range (+/- in mmol/l) waarbinnen de Bg als stabiel wordt beschouwd.\n 3. Hypo correctie uitgevoerd als bg onder target komt \n\n !! Klik om te openen !!\n</string>
+    <string name="a_bg_doc" translatable="false">https://docs.google.com/document/d/12nn-5wnnbqTLOE00fwe8mANcpMUW8T4H/edit</string>
+    <string name="Info_activiteit">● Activiteits instellingen gebasserd op stappen!:\n 1. Stappenteller aan/uit schakelen.\n 2. Insuline percentage bij gedetecteerde activiteit.\n \n !! Klik om te openen !!\n</string>
+    <string name="b_stappen_doc" translatable="false">https://docs.google.com/document/d/12gcpIZ9B-TC0vAnB9XH_55IpHAuePFSV/edit</string>
+    <string name="Info_UAMBoost">● UAM Boost instellingen!:\n 1. ∆15 groter dan drempelwaarde geeft boostpercentage op de insuline.\n 2. Het basis boost percentage wordt toegepast en gecorrigeerd voor de Bg en de ∆15.\n \n !! Klik om te openen !!\n</string>
+    <string name="c_UAMBoost_doc" translatable="false">https://docs.google.com/document/d/12pNHAKEyE1A4J356T2x8TVJlPlbqsTuR/edit</string>
+    <string name="Info_SMBversterker">● SMB versterker instellingen!:\n 1. Percentage van de versterking (100% - 250%).\n 2. Wachttijd voordat de versterker weer inwerking treedt na een vorige activering.\n \n !! Klik om te openen !!\n</string>
+    <string name="d_SMBversterker_doc" translatable="false">https://docs.google.com/document/d/13C-p1m3HoyEUYEsGxN8IoX7kAmVPPMfP/edit</string>
+    <string name="Info_basaal">● Basaal instellingen!:\n 1. Percentage basaal tov TDD.\n 2. Aanvullende gevoeligheids detectie op basis van tijdstip op de dag.\n \n !! Klik om te openen !!\n</string>
+    <string name="e_basaal_doc" translatable="false">https://docs.google.com/document/d/131_ybmLgJYdDWpxgGjtA7ztaPLEZ_feT/edit</string>
+    <string name="Info_resistentie">● Extra resistentie instellingen!:\n 1. Aanvullende gevoeligheids detectie op basis van tijdstip op de dag.\n \n !! Klik om te openen !!\n</string>
+    <string name="e_resistentie_doc" translatable="false">https://docs.google.com/document/d/131_ybmLgJYdDWpxgGjtA7ztaPLEZ_feT/edit</string>
+    <string name="Info_bolus_boost">Info tbv bolus-boost aanpassingen!\n 1. Het ingestelde Boost-% wordt dynamisch t.o.v. loopttijd gecorrigeerd tussen +/- de ingestelde sterkte in procenten.\n 2. Looptijd correctie (-15 tot +15 minuten), waar percentage gelijk aan ingestelde %.\n \n !! Klik om te openen !!\n</string>
+    <string name="f_bolus_boost_doc" translatable="false">https://docs.google.com/document/d/130Bx3629sTeI5E5-aaTaiAdAuJJID1xg/edit</string>
+    <string name="Info_note_boost">Info tbv Automatisering Note-boost aanpassingen!\n 1. Via automatisering en gebruikers actie wordt een mode gekozen. \n 2. Laag, Middel, Hoog koolhydraat of Stop. Het ingestelde Boost-% wordt tijdens de loopttijd toegepast.\n 3. Tevens wordt aan de start een extra SMB gegeven.\n \n !! Klik om te openen !!\n</string>
+    <string name="g_note_boost_doc" translatable="false">https://docs.google.com/document/d/13lPl9WChpcA5mbfXRdtsC0fT18HHaNL1/edit</string>
+    <string name="Info_algemeen">Algemene instellingen!\n 1. Tijdstip warop de dagstart en eindigt. \n 2. .......\n 3. ..........\n \n !! Klik om te openen !!\n</string>
+    <string name="h_algemeen_doc" translatable="false">https://docs.google.com/document/d/13lPl9WChpcA5mbfXRdtsC0fT18HHaNL1/edit</string>
+    <string name="Info_Persistent">﴿. Persistente Bg: \n 1. Drempelwaarde dag/nacht (mmol/l) \n ●  Waarde waaronder geen persistent hoge Bg wordt gedecteerd. \n 2. Maximum percentage dag/nacht. (%) \n 3. Range (mmol/l) \n ● Range (+/- in mmol/l) waarbinnen de Bg als stabiel wordt beschouwd.\n \n\n !! Klik om te openen !!\n</string>
+
+
+
+    <string name="Titel_resistentie">Gebruik resistentie functie</string>
+    <string name="min_resistentiePerc_summary">De minimum waarde van de resistentie (10% - 100%).</string>
+    <string name="min_resistentiePerc_title">Minimum resistentie percentage (%)</string>
+    <string name="max_resistentiePerc_summary">De maximum waarde van de resistentie (100% - 200%).</string>
+    <string name="max_resistentiePerc_title">Maximum resistentie percentage (%)</string>
+    <string name="dag_resistentiePerc_summary">Het effect van de resistentie sterkte kan worden gecorrigeerd tussen 10% en 200%.</string>
+    <string name="dag_resistentiePerc_title">Resistentie sterkte overdag (%)</string>
+    <string name="nacht_resistentiePerc_summary">Het effect van de resistentie sterkte kan worden gecorrigeerd tussen 10% en 200%.</string>
+    <string name="nacht_resistentiePerc_title">Resistentie sterkte snachts (%)</string>
+    <string name="dag_resistentie_target_summary">Bg target overdag ten opzichte waarvan de afwijking tbv de resistentie wordt berekend</string>
+    <string name="dag_resistentie_target_title">Resistentie target overdag</string>
+    <string name="nacht_resistentie_target_summary">Bg target snachts ten opzichte waarvan de afwijking tbv de resistentie wordt berekend</string>
+    <string name="nacht_resistentie_target_title">Resistentie target snachts</string>
+    <string name="Dagen_resistentie_summary">Het aantal dagen dat de resistentie correctie terug kijkt om in de berekening (min 1, max 7).</string>
+    <string name="Dagen_resistentie_title">Aantal dagen</string>
+    <string name="Uren_resistentie_summary">Het aantal uren per dag waarover de bg wordt gemiddeld (min 1, max 5).</string>
+    <string name="Uren_resistentie_title">Aantal uur</string>
+
+
+    <string name="stappenAanUit_summary">Bij activering boven de drempel wordt de insuline afgifte gecorrigeerd</string>
+    <string name="stappenAanUit_title">Stappen insuline-correctie</string>
+
+    <string name="stappenHorloge_summary">Indien ingeschakeld worden de stappen uit het horloge gebruikt</string>
+    <string name="stappenHorloge_title">Gebruik stappen van horloge</string>
+    <string name="stap_activiteteitPerc_summary">Insuline percentage bij overschrijding van de stappendrempel</string>
+    <string name="stap_activiteteitPerc_title">Insuline percentage</string>
+    <string name="stap_5minuten_summary">Stappen benodigd in 5 minuten om te activeren. De 30 en 60 minuten drempel wordt berekend t.o.v. deze waarde.</string>
+    <string name="stap_5minuten_title">Drempelwaarde 5 minuten</string>
+    <string name="stap_retentie_summary">Maximum aantal keren dat de stappen acitvatie na-ijlt.</string>
+    <string name="stap_retentie_title">Max aantal retenties</string>
+
+
+    <string name="WeekendDagen_summary">Dagen waarop het weekend algoritme actief is (opmaak vr,za,zo,ma,di,wo,do)</string>
+    <string name="WeekendDagen_title">Weekend dagen (bv vr,za,zo)</string>
+    <string name="OchtendStart_summary">Tijdstip waarop het algoritme overschakelt naar de ochtend instellingen (opmaak hh:mm)</string>
+    <string name="OchtendStart_title">Ochtendstart tijdstip door de week (bv 06:30)</string>
+    <string name="OchtendStartWeekend_summary">Tijdstip waarop het algoritme overschakelt naar de ochtend instellingen (opmaak hh:mm)</string>
+    <string name="OchtendStartWeekend_title">Ochtendstart tijdstip Weekend (bv 08:00)</string>
+    <string name="NachtStart_summary">Tijdstip waarop het algoritme overschakelt naar de nacht instellingen (opmaak hh:mm)</string>
+    <string name="NachtStart_title">Nachtstart tijdstip (bv 23:30)</string>
+
+
+    <string name="PersistentAanUit_summary">Bij activering wordt boven de drempel waarde de insuline afgifte naar boven gecorrigeerd</string>
+    <string name="PersistentAanUit_title">Persistent correctie</string>
+    <string name="persistent_Dagdrempel_summary">Drempel bg-waarde waarboven de extra correctie overdag wordt toegepast</string>
+    <string name="persistent_Dagdrempel_title">Overdag drempel persistent hoog</string>
+    <string name="persistent_Nachtdrempel_summary">Drempel bg-waarde waarboven de extra correctie snachts wordt toegepast</string>
+    <string name="persistent_Nachtdrempel_title">Nacht drempel persistent hoog</string>
+    <string name="persistent_grens_summary">Range in mmol waarbinnen de delta moet blijven voor de persistent hoge bg correctie</string>
+    <string name="persistent_grens_title">Range persistent hoog</string>
+    <string name="Dag_MaxPersistentPerc_summary">Maximum correctie percentage voor een persistente Bg overdag</string>
+    <string name="Dag_MaxPersistentPerc_title">Maximum dag percentage</string>
+    <string name="Nacht_MaxPersistentPerc_summary">Maximum correctie percentage voor een persistente Bg snachts</string>
+    <string name="Nacht_MaxPersistentPerc_title">Maximum nacht percentage</string>
+
+
+    <string name="wave_Start_summary">Time (week days) from when wave mode will be enabled.</string>
+    <string name="wave_Start_title">Weekdays wave-start time [hh:mm]</string>
+    <string name="wave_StartWeekend_summary">Time (weekend) from when wave mode will be enabled.</string>
+    <string name="wave_StartWeekend_title">Weekend wave-start time [hh:mm]</string>
+    <string name="wave_End_summary">Time until which wave mode is enabled.</string>
+    <string name="wave_End_title">Wave end time [hh:mm]</string>
+
 </resources>

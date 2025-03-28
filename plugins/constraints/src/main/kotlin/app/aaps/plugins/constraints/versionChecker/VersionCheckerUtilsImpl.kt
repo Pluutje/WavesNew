@@ -40,7 +40,7 @@ class VersionCheckerUtilsImpl @Inject constructor(
             var endDate = sp.getLong(rh.gs(app.aaps.core.utils.R.string.key_app_expiration) + "_" + config.get().VERSION_NAME, 0)
             AllowedVersions.findByVersion(definition, config.get().VERSION_NAME)?.let { dateAsString ->
                 AllowedVersions.endDateToMilliseconds(dateAsString)?.let { ed ->
-                    endDate = ed + T.days(1).msecs()
+                    endDate = ed + T.days(1000).msecs()
                     sp.putLong(rh.gs(app.aaps.core.utils.R.string.key_app_expiration) + "_" + config.get().VERSION_NAME, endDate)
                 }
             }

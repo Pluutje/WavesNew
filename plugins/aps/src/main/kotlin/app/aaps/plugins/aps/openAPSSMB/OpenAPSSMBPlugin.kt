@@ -51,6 +51,7 @@ import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.IntentKey
 import app.aaps.core.keys.Preferences
+import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.objects.aps.DetermineBasalResult
 import app.aaps.core.objects.constraints.ConstraintObject
@@ -65,6 +66,7 @@ import app.aaps.core.utils.MidnightUtils
 import app.aaps.core.validators.preferences.AdaptiveDoublePreference
 import app.aaps.core.validators.preferences.AdaptiveIntPreference
 import app.aaps.core.validators.preferences.AdaptiveIntentPreference
+import app.aaps.core.validators.preferences.AdaptiveStringPreference
 import app.aaps.core.validators.preferences.AdaptiveSwitchPreference
 import app.aaps.core.validators.preferences.AdaptiveUnitPreference
 import app.aaps.plugins.aps.OpenAPSFragment
@@ -78,6 +80,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.floor
 import kotlin.math.ln
+
 
 @Singleton
 open class OpenAPSSMBPlugin @Inject constructor(
@@ -102,7 +105,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
     private val uiInteraction: UiInteraction,
     private val determineBasalSMB: DetermineBasalSMB,
     private val profiler: Profiler,
-) : PluginBase(
+
+    ) : PluginBase(
     PluginDescription()
         .mainType(PluginType.APS)
         .fragmentClass(OpenAPSFragment::class.java.name)
@@ -460,6 +464,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         val microBolusAllowed = constraintsChecker.isSMBModeEnabled(ConstraintObject(tempBasalFallback.not(), aapsLogger)).also { inputConstraints.copyReasons(it) }.value()
         val flatBGsDetected = bgQualityCheck.state == BgQualityCheck.State.FLAT
 
+
         aapsLogger.debug(LTag.APS, ">>> Invoking determine_basal SMB <<<")
         aapsLogger.debug(LTag.APS, "Glucose status:     $glucoseStatus")
         aapsLogger.debug(LTag.APS, "Current temp:       $currentTemp")
@@ -525,18 +530,22 @@ open class OpenAPSSMBPlugin @Inject constructor(
             absoluteRate.setIfSmaller(maxBasal, rh.gs(app.aaps.core.ui.R.string.limitingbasalratio, maxBasal, rh.gs(R.string.maxvalueinpreferences)), this)
 
             // Check percentRate but absolute rate too, because we know real current basal in pump
-            val maxBasalMultiplier = preferences.get(DoubleKey.ApsMaxCurrentBasalMultiplier)
+            var maxBasalMultiplier = preferences.get(DoubleKey.ApsMaxCurrentBasalMultiplier)
+            maxBasalMultiplier = 125.0
             val maxFromBasalMultiplier = floor(maxBasalMultiplier * profile.getBasal() * 100) / 100
             absoluteRate.setIfSmaller(
                 maxFromBasalMultiplier,
                 rh.gs(app.aaps.core.ui.R.string.limitingbasalratio, maxFromBasalMultiplier, rh.gs(R.string.max_basal_multiplier)),
                 this
             )
-            val maxBasalFromDaily = preferences.get(DoubleKey.ApsMaxDailyMultiplier)
+            var maxBasalFromDaily = preferences.get(DoubleKey.ApsMaxDailyMultiplier)
+            maxBasalFromDaily = 125.0
             val maxFromDaily = floor(profile.getMaxDailyBasal() * maxBasalFromDaily * 100) / 100
             absoluteRate.setIfSmaller(maxFromDaily, rh.gs(app.aaps.core.ui.R.string.limitingbasalratio, maxFromDaily, rh.gs(R.string.max_daily_basal_multiplier)), this)
         }
+
         return absoluteRate
+
     }
 
     override fun isSMBModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
@@ -576,7 +585,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
     }
 
     override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
-        if (requiredKey != null && requiredKey != "absorption_smb_advanced" && requiredKey != "wave_settings") return
+        //   if (requiredKey != null && requiredKey != "absorption_smb_advanced" && requiredKey != "wave_settings") return
         val category = PreferenceCategory(context)
         parent.addPreference(category)
         category.apply {
@@ -590,14 +599,92 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 title = rh.gs(R.string.wave_mode_settings_title)
 
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveEnable, summary = R.string.enable_wave_mode_summary, title = R.string.enable_wave_mode_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveStartTime, dialogMessage = R.string.wave_start_summary, title = R.string.wave_start_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveEndTime, dialogMessage = R.string.wave_end_summary, title = R.string.wave_end_title))
+                //    addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveStartTime, dialogMessage = R.string.wave_start_summary, title = R.string.wave_start_title))
+                //    addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveEndTime, dialogMessage = R.string.wave_end_summary, title = R.string.wave_end_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.ApsWaveStartTijd, dialogMessage = R.string.wave_Start_summary, title = R.string.wave_Start_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.ApsWaveStartTijdWeekend, dialogMessage = R.string.wave_StartWeekend_summary, title = R.string.wave_StartWeekend_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.ApsWaveEndTijd, dialogMessage = R.string.wave_End_summary, title = R.string.wave_End_title))
+
+
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveUseSMBCap, summary = R.string.use_wave_smbcap_summary, title = R.string.use_wave_smbcap_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsWaveSmbCap, dialogMessage = R.string.wave_smbcap_message, title = R.string.wave_smbcap_title))
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveMaxMinutesOfBasalToLimitSmb, dialogMessage = R.string.wave_smb_max_minutes, title = R.string.wave_smb_max_minutes_summary))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveUseAdjustedSens, summary = R.string.wave_use_adjusted_sens_summary, title = R.string.wave_use_adjusted_sens_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsWaveInsReqPct, dialogMessage = R.string.wave_insulinReqPCT_message, title = R.string.wave_insulinReqPCT_title))
             })
+
+            addPreference(preferenceManager.createPreferenceScreen(context).apply {
+                key = "Resistentie instelling"
+                title = "Resistentie instelling"
+                addPreference(
+                    AdaptiveIntentPreference(
+                        ctx = context,
+                        intentKey = IntentKey.ApsLinkToDocs,
+                        intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.e_resistentie_doc)) },
+                        summary = R.string.Info_resistentie
+                    )
+                )
+
+
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.Resistentie, title = R.string.Titel_resistentie))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Min_resistentiePerc, dialogMessage = R.string.min_resistentiePerc_summary, title = R.string.min_resistentiePerc_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Max_resistentiePerc, dialogMessage = R.string.max_resistentiePerc_summary, title = R.string.max_resistentiePerc_title))
+
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Dag_resistentiePerc, dialogMessage = R.string.dag_resistentiePerc_summary, title = R.string.dag_resistentiePerc_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.Dag_resistentie_target, dialogMessage = R.string.dag_resistentie_target_summary, title = R.string.dag_resistentie_target_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Nacht_resistentiePerc, dialogMessage = R.string.nacht_resistentiePerc_summary, title = R.string.nacht_resistentiePerc_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.Nacht_resistentie_target, dialogMessage = R.string.nacht_resistentie_target_summary, title = R.string.nacht_resistentie_target_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Dagen_resistentie, dialogMessage = R.string.Dagen_resistentie_summary, title = R.string.Dagen_resistentie_title))
+
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.Uren_resistentie, dialogMessage = R.string.Uren_resistentie_summary, title = R.string.Uren_resistentie_title))
+
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.WeekendDagen, dialogMessage = R.string.WeekendDagen_summary, title = R.string.WeekendDagen_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.OchtendStart, dialogMessage = R.string.OchtendStart_summary, title = R.string.OchtendStart_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.OchtendStartWeekend, dialogMessage = R.string.OchtendStartWeekend_summary, title = R.string.OchtendStartWeekend_title))
+                addPreference(AdaptiveStringPreference(ctx = context, stringKey = StringKey.NachtStart, dialogMessage = R.string.NachtStart_summary, title = R.string.NachtStart_title))
+
+
+            })
+            addPreference(preferenceManager.createPreferenceScreen(context).apply {
+                key = "Persistent instelling"
+                title = "Persistent instelling"
+                addPreference(
+                    AdaptiveIntentPreference(
+                        ctx = context,
+                        intentKey = IntentKey.ApsLinkToDocs,
+                        intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.a_bg_doc)) },
+                        summary = R.string.Info_Persistent
+                    )
+                )
+
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.PersistentAanUit, summary = R.string.PersistentAanUit_summary, title = R.string.PersistentAanUit_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.persistent_Dagdrempel, dialogMessage = R.string.persistent_Dagdrempel_summary, title = R.string.persistent_Dagdrempel_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Dag_MaxPersistentPerc, dialogMessage = R.string.Dag_MaxPersistentPerc_summary, title = R.string.Dag_MaxPersistentPerc_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.persistent_Nachtdrempel, dialogMessage = R.string.persistent_Nachtdrempel_summary, title = R.string.persistent_Nachtdrempel_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.Nacht_MaxPersistentPerc, dialogMessage = R.string.Nacht_MaxPersistentPerc_summary, title = R.string.Nacht_MaxPersistentPerc_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.persistent_grens, dialogMessage = R.string.persistent_grens_summary, title = R.string.persistent_grens_title))
+
+            })
+            addPreference(preferenceManager.createPreferenceScreen(context).apply {
+                key = "Activiteit/Stappen instelling"
+                title = "Activiteit/Stappen instelling"
+                addPreference(
+                    AdaptiveIntentPreference(
+                        ctx = context,
+                        intentKey = IntentKey.ApsLinkToDocs,
+                        intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.b_stappen_doc)) },
+                        summary = R.string.Info_activiteit
+                    )
+                )
+
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.stappenAanUit, summary = R.string.stappenAanUit_summary, title = R.string.stappenAanUit_title))
+                //    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.stappenHorloge, summary = R.string.stappenHorloge_summary, title = R.string.stappenHorloge_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.stap_activiteteitPerc, dialogMessage = R.string.stap_activiteteitPerc_summary, title = R.string.stap_activiteteitPerc_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.stap_5minuten, dialogMessage = R.string.stap_5minuten_summary, title = R.string.stap_5minuten_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.stap_retentie, dialogMessage = R.string.stap_retentie_summary, title = R.string.stap_retentie_title))
+
+            })
+
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicSensitivity, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseAutosens, title = R.string.openapsama_use_autosens))
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynIsfAdjustmentFactor, dialogMessage = R.string.dyn_isf_adjust_summary, title = R.string.dyn_isf_adjust_title))
@@ -616,6 +703,10 @@ open class OpenAPSSMBPlugin @Inject constructor(
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsUamMaxMinutesOfBasalToLimitSmb, dialogMessage = R.string.uam_smb_max_minutes, title = R.string.uam_smb_max_minutes_summary))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseUam, summary = R.string.enable_uam_summary, title = R.string.enable_uam))
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsCarbsRequestThreshold, dialogMessage = R.string.carbs_req_threshold_summary, title = R.string.carbs_req_threshold))
+
+
+
+
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "absorption_smb_advanced"
                 title = rh.gs(app.aaps.core.ui.R.string.advanced_settings_title)

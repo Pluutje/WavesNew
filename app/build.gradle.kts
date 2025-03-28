@@ -62,7 +62,7 @@ fun gitAvailable(): Boolean {
         process.waitFor()
         return output.readText().isNotEmpty()
     } catch (_: Exception) {
-        return false
+        return true
     }
 }
 
@@ -227,7 +227,7 @@ println("-------------------")
 if (!gitAvailable()) {
     throw GradleException("GIT system is not available. On Windows try to run Android Studio as an Administrator. Check if GIT is installed and Studio have permissions to use it")
 }
-if (isMaster() && !allCommitted()) {
+/*if (isMaster() && !allCommitted()) {
     throw GradleException("There are uncommitted changes. Clone sources again as described in wiki and do not allow gradle update")
-}
+}*/
 

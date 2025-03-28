@@ -2,9 +2,9 @@
 <animation-list xmlns:android="http://schemas.android.com/apk/res/android"
     android:oneshot="false">
     <item
-        android:drawable="@drawable/ic_cp_bolus_carbs"
+        android:drawable="@drawable/tir"
         android:duration="1200" />
     <item
-        android:drawable="@drawable/ic_cp_bolus_carbs_red"
+        android:drawable="@drawable/tir"
         android:duration="1200" />
 </animation-list>

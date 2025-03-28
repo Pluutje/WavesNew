@@ -1,7 +1,9 @@
 package app.aaps.plugins.aps.openAPSSMB
 
+import android.os.Environment
 import app.aaps.core.data.aps.SMBDefaults
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.aps.CurrentTemp
@@ -28,6 +30,7 @@ import java.text.DecimalFormat
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,8 +39,23 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.StringKey
+import java.io.File
+import java.io.IOException
+import java.util.Scanner
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
 
 @Singleton
+data class uur_minuut(val uur: Int, val minuut: Int)
+data class Resistentie_class(val resistentie: Double, val log: String)
+data class Stappen_class(val StapPercentage: Float,val StapTarget: Float, val log: String)
+data class Persistent_class(val PercistentPercentage: Double, val log: String)
+data class Bolus_Basaal(val BolusViaBasaal: Boolean, val BasaalStand: Float , val ResterendeTijd: Float)
+data class Extra_Insuline(val ExtraIns_AanUit: Boolean, val ExtraIns_waarde: Double ,val log: String)
+
 class DetermineBasalSMB @Inject constructor(
     private val profileUtil: ProfileUtil,
     private val activePlugin: ActivePlugin,
@@ -45,11 +63,19 @@ class DetermineBasalSMB @Inject constructor(
     private val iobCobCalculator: IobCobCalculator,
     private val persistenceLayer: PersistenceLayer,
     private val preferences: Preferences,
-    private val fabricPrivacy: FabricPrivacy
+    private val fabricPrivacy: FabricPrivacy,
+    private val dateUtil: DateUtil,
+    //   private val stepsCount: StepsCount,
+
 ) {
 
+    private var StapRetentie: Int = 0
+    private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
+    private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
+    private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
     private val consoleError = mutableListOf<String>()
     private val consoleLog = mutableListOf<String>()
+    private var bolus_via_basaal = false
 
     private fun consoleLog(msg: String) {
         consoleLog.add(msg)
@@ -127,7 +153,7 @@ class DetermineBasalSMB @Inject constructor(
         }
 
         consoleError("SMB disabled (no enableSMB preferences active or no condition satisfied)")
-        return false
+        return true
     }
 
     fun reason(rT: RT, msg: String) {
@@ -136,8 +162,12 @@ class DetermineBasalSMB @Inject constructor(
         consoleError(msg)
     }
 
-    private fun getMaxSafeBasal(profile: OapsProfile): Double =
-        min(profile.max_basal, min(profile.max_daily_safety_multiplier * profile.max_daily_basal, profile.current_basal_safety_multiplier * profile.current_basal))
+    private fun getMaxSafeBasal(profile: OapsProfile): Double {
+        if (!bolus_via_basaal) {
+            return min(profile.max_basal, min(profile.max_daily_safety_multiplier * profile.max_daily_basal, profile.current_basal_safety_multiplier * profile.current_basal))
+        } else {
+            return 25.0}
+    }
 
     fun setTempBasal(_rate: Double, duration: Int, profile: OapsProfile, rT: RT, currenttemp: CurrentTemp): RT {
         //var maxSafeBasal = Math.min(profile.max_basal, 3 * profile.max_daily_basal, 4 * profile.current_basal);
@@ -177,6 +207,566 @@ class DetermineBasalSMB @Inject constructor(
         }
     }
 
+    // Functie om te controleren of de huidige tijd binnen het tijdsbereik valt
+    fun isInTijdBereik(hh: Int, mm: Int, startUur: Int, startMinuut: Int, eindUur: Int, eindMinuut: Int): Boolean {
+        val startInMinuten = startUur * 60 + startMinuut
+        val eindInMinuten = eindUur * 60 + eindMinuut
+        val huidigeTijdInMinuten = hh * 60 + mm
+
+        // Als het eindtijdstip voor middernacht is (bijvoorbeeld van 23:00 tot 05:00), moeten we dat apart behandelen
+        return if (eindInMinuten < startInMinuten) {
+            // Tijdsbereik over de middernacht (bijvoorbeeld 23:00 tot 05:00)
+            huidigeTijdInMinuten >= startInMinuten || huidigeTijdInMinuten < eindInMinuten
+        } else {
+            // Normale tijdsbereik (bijvoorbeeld van 08:00 tot 17:00)
+            huidigeTijdInMinuten in startInMinuten..eindInMinuten
+        }
+    }
+
+    fun refreshTime() : uur_minuut {
+        val calendarInstance = Calendar.getInstance() // Nieuwe tijd ophalen
+
+        val uur = calendarInstance[Calendar.HOUR_OF_DAY]
+        val minuut = calendarInstance[Calendar.MINUTE]
+        return uur_minuut(uur,minuut)
+    }
+
+
+
+    fun calculateCorrectionFactor(bgGem: Double, targetProfiel: Double, macht: Double, rel_std: Int): Double {
+        var rel_std_cf = 1.0
+        if (bgGem > targetProfiel) {
+            rel_std_cf = 1.0/rel_std + 1.0
+        }
+        var cf = Math.pow(bgGem / (targetProfiel), macht) * rel_std_cf
+        if (cf < 0.1) cf = 1.0
+
+        return cf
+    }
+
+    fun logBgHistoryWithStdDev(startHour: Long, endHour: Long, uren: Long): Pair<Double, Double> {
+        // Constants
+        val MIN_READINGS_PER_HOUR = 8
+        val MG_DL_TO_MMOL_L_CONVERSION = 18.0
+
+        // Bereken start- en eindtijd
+        val now = dateUtil.now()
+        val startTime = now - T.hours(hour = startHour).msecs()
+        val endTime = now - T.hours(hour = endHour).msecs()
+
+        // Haal bloedglucosewaarden op
+        val bgReadings = persistenceLayer.getBgReadingsDataFromTimeToTime(startTime, endTime, false)
+
+        // Controleer of er voldoende data is
+        if (bgReadings.size < MIN_READINGS_PER_HOUR * uren) {
+            return Pair(0.0, 0.0) // Onvoldoende data
+        }
+
+        // Bereken gemiddelde in mmol/L
+        val totalBgValue = bgReadings.sumOf { it.value }
+        val bgAverage = (totalBgValue / bgReadings.size) / MG_DL_TO_MMOL_L_CONVERSION
+
+        // Bereken variantie en standaarddeviatie
+        val variance = bgReadings.sumOf {
+            val bgInMmol = it.value / MG_DL_TO_MMOL_L_CONVERSION
+            (bgInMmol - bgAverage) * (bgInMmol - bgAverage)
+        } / bgReadings.size
+
+        val stdDev = Math.sqrt(variance)
+
+        return Pair(bgAverage, stdDev)
+    }
+
+    fun WaveActief(): Boolean {
+        val Startweek = preferences.get(StringKey.ApsWaveStartTijd)
+        val Startweekend = preferences.get(StringKey.ApsWaveStartTijdWeekend)
+        val End = preferences.get(StringKey.ApsWaveEndTijd)
+        val WeekendDagen = preferences.get(StringKey.WeekendDagen)
+        val (uur,minuten) = refreshTime()
+
+        val dayMapping = mapOf(
+            "ma" to Calendar.MONDAY,
+            "di" to Calendar.TUESDAY,
+            "wo" to Calendar.WEDNESDAY,
+            "do" to Calendar.THURSDAY,
+            "vr" to Calendar.FRIDAY,
+            "za" to Calendar.SATURDAY,
+            "zo" to Calendar.SUNDAY
+        )
+
+// Converteer de invoerstring naar een lijst van Calendar-dagen
+        //    val weekendString = WeekendDagen
+        val weekendDays = WeekendDagen.split(",")
+            .mapNotNull { dayMapping[it.trim()] } // Map afkortingen naar Calendar-waarden en filter null-waarden
+
+// Wijs de lijst toe aan profile.WeekendDays
+        val calendarInstance = Calendar.getInstance() // Nieuwe tijd ophalen
+        val dayOfWeek = calendarInstance[Calendar.DAY_OF_WEEK]
+        val weekend = dayOfWeek in weekendDays
+
+
+        val (StartUur, StartMinuut) = if (weekend) {
+            Startweekend.split(":").map { it.toInt() }
+        } else {
+            Startweek.split(":").map { it.toInt() }
+        }
+
+        val (EndUur, EndMinuut) = End.split(":").map { it.toInt() }
+
+        if (isInTijdBereik(uur, minuten, StartUur, StartMinuut, EndUur, EndMinuut)) {
+            return true
+        } else {
+            return false
+        }
+
+
+    }
+
+    fun Nacht():Boolean {
+        val OchtendStart = preferences.get(StringKey.OchtendStart)
+        val OchtendStartWeekend = preferences.get(StringKey.OchtendStartWeekend)
+        val NachtStart = preferences.get(StringKey.NachtStart)
+        val WeekendDagen = preferences.get(StringKey.WeekendDagen)
+        // Dag - Nacht
+        val (uurVanDag,minuten) = refreshTime()
+        val minuutTxt = String.format("%02d", minuten)
+
+        val dayMapping = mapOf(
+            "ma" to Calendar.MONDAY,
+            "di" to Calendar.TUESDAY,
+            "wo" to Calendar.WEDNESDAY,
+            "do" to Calendar.THURSDAY,
+            "vr" to Calendar.FRIDAY,
+            "za" to Calendar.SATURDAY,
+            "zo" to Calendar.SUNDAY
+        )
+
+// Converteer de invoerstring naar een lijst van Calendar-dagen
+        //    val weekendString = WeekendDagen
+        val weekendDays = WeekendDagen.split(",")
+            .mapNotNull { dayMapping[it.trim()] } // Map afkortingen naar Calendar-waarden en filter null-waarden
+
+// Wijs de lijst toe aan profile.WeekendDays
+        val calendarInstance = Calendar.getInstance() // Nieuwe tijd ophalen
+        val dayOfWeek = calendarInstance[Calendar.DAY_OF_WEEK]
+        val weekend = dayOfWeek in weekendDays
+
+
+        val (OchtendStartUur, OchtendStartMinuut) = if (weekend) {
+            OchtendStartWeekend.split(":").map { it.toInt() }
+        } else {
+            OchtendStart.split(":").map { it.toInt() }
+        }
+
+        val (NachtStartUur, NachtStartMinuut) = NachtStart.split(":").map { it.toInt() }
+
+        if (isInTijdBereik(uurVanDag, minuten, NachtStartUur, NachtStartMinuut, OchtendStartUur, OchtendStartMinuut)) {
+            return true
+        } else {
+            return false
+        }
+
+    }
+
+
+    fun Resistentie(): Resistentie_class {
+        var log_resistentie = " ﴿ Resistentie Correctie ﴾" + "\n"
+        val enableResistentie = preferences.get(BooleanKey.Resistentie)
+        val MinresistentiePerc = preferences.get(IntKey.Min_resistentiePerc)
+        val MaxresistentiePerc = preferences.get(IntKey.Max_resistentiePerc)
+        val DagresistentiePerc = preferences.get(IntKey.Dag_resistentiePerc)
+        val NachtresistentiePerc = preferences.get(IntKey.Nacht_resistentiePerc)
+        val Dagenresistentie = preferences.get(IntKey.Dagen_resistentie)
+
+        val Urenresistentie = preferences.get(DoubleKey.Uren_resistentie)
+        val Dagresistentie_target = preferences.get(DoubleKey.Dag_resistentie_target)
+        val Nachtresistentie_target = preferences.get(DoubleKey.Nacht_resistentie_target)
+
+
+        if (!enableResistentie) {
+            log_resistentie = log_resistentie + " → resistentie aan/uit: uit " + "\n"
+            return Resistentie_class(1.0,log_resistentie)
+        }
+        log_resistentie = log_resistentie + " → resistentie aan/uit: aan " + "\n"
+
+        var ResistentieCfEff = 0.0
+        var resistentie_percentage = 100
+        var target = 5.2
+        val (uurVanDag,minuten) = refreshTime()
+
+
+        // Dag - Nacht
+
+        val minuutTxt = String.format("%02d", minuten)
+
+
+
+        if (Nacht()) {
+            resistentie_percentage = NachtresistentiePerc
+            target = Nachtresistentie_target
+            log_resistentie = log_resistentie + " ● Tijd: " + uurVanDag.toString() + ":" + minuutTxt + " → s'Nachts" + "\n"
+            log_resistentie = log_resistentie + "      → perc.: " + resistentie_percentage + "%" + "\n"
+            log_resistentie = log_resistentie + "      → Target: " + round(target,1) + " mmol/l" + "\n"
+        } else {
+            resistentie_percentage = DagresistentiePerc
+            target = Dagresistentie_target
+            log_resistentie += " ● Tijd: " + uurVanDag.toString() + ":" + minuutTxt + " → Overdag"+ "\n"
+            log_resistentie += "      → perc.: " + resistentie_percentage + "%" + "\n"
+            log_resistentie += "      → Target: " + round(target,1) + " mmol/l" + "\n"
+        }
+
+        val urenTot = (uurVanDag + 1 + Urenresistentie)
+        var urenTotUur = urenTot.toInt() // Uren als geheel getal
+        var urenTotMinuut = ((urenTot - urenTotUur) * 60).toInt() + minuten // Minuten optellen
+
+// Controleer of minuten >= 60 en pas aan
+        if (urenTotMinuut >= 60) {
+            urenTotMinuut -= 60
+            urenTotUur += 1
+        }
+
+        log_resistentie += " ● Referentie periode :" + "\n"
+        log_resistentie += "      → afgelopen " + Dagenresistentie.toString() + " dagen" + "\n"
+        log_resistentie += "      → van ${uurVanDag + 1}:$minuutTxt tot $urenTotUur:${String.format("%02d", urenTotMinuut)}\n"
+
+
+        val macht =  Math.pow(resistentie_percentage.toDouble(), 1.4)/2800
+        val numPairs = Dagenresistentie // Hier kies je hoeveel paren je wilt gebruiken
+
+        val x = Urenresistentie
+        val intervals = mutableListOf<Pair<Double, Double>>()
+
+
+        for (i in 1..numPairs) {
+            val base = (24.0 * i) - 1    // Verhoogt telkens met 24: 24, 48, 72, ...
+            intervals.add(Pair(base, base - x))
+        }
+
+        val correctionFactors = mutableListOf<Double>()
+        val formatter = DateTimeFormatter.ofPattern("dd-MM")
+        val today = LocalDate.now()
+
+        for ((index, interval) in intervals.take(numPairs).withIndex()) {
+
+            val startTime = interval.first.toLong()
+            val endTime = interval.second.toLong()
+
+            val (bgGem, bgStdDev) = logBgHistoryWithStdDev(startTime, endTime, x.toLong())
+            val rel_std = (bgStdDev / bgGem * 100).toInt()
+            val cf = calculateCorrectionFactor(bgGem, target, macht, rel_std)
+
+            val dateString = today.minusDays(index.toLong()).format(formatter)
+
+            log_resistentie += " → ${dateString} : correctie percentage = " + (cf * 100).toInt() + "%" + "\n"
+            log_resistentie += "   ϟ Bg gem: ${round(bgGem, 1)}     ϟ Rel StdDev: $rel_std %.\n"
+
+            correctionFactors.add(cf)
+        }
+// Bereken CfEff met het gekozen aantal correctiefactoren
+        var tot_gew_gem = 0
+        for (i in 0 until numPairs) {
+            val divisor = when (i) {
+                0   -> 70
+                1   -> 25
+                2   -> 5
+                3   -> 3
+                4   -> 2
+                else -> 1 // Aanpassen voor extra correctiefactoren indien nodig
+            }
+            ResistentieCfEff += correctionFactors[i] * divisor
+            tot_gew_gem += divisor
+        }
+
+        ResistentieCfEff = ResistentieCfEff / tot_gew_gem.toDouble()
+
+        val minRes = MinresistentiePerc.toDouble()/100
+        val maxRes = MaxresistentiePerc.toDouble()/100
+
+        ResistentieCfEff = ResistentieCfEff.coerceIn(minRes, maxRes)
+
+        if (ResistentieCfEff > minRes && ResistentieCfEff < maxRes){
+            log_resistentie = log_resistentie + "\n" + " »» Cf_eff = " + (ResistentieCfEff * 100).toInt() + "%" + "\n"
+        } else {
+            log_resistentie = log_resistentie + "\n" + " »» Cf_eff (begrensd) = " + (ResistentieCfEff * 100).toInt() + "%" + "\n"
+        }
+
+        val resistentie_perc = (ResistentieCfEff*100).toInt().toString()
+        val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
+        val Resitenstiefile = File(externalDir, "ANALYSE/resistentie.txt")
+        Resitenstiefile.writeText(resistentie_perc)
+
+        return Resistentie_class(ResistentieCfEff,log_resistentie)
+
+    }
+
+    fun Stappen(): Stappen_class {
+
+        var log_Stappen = " ﴿ Stappen ﴾" + "\n"
+        var stap_perc = 100f
+        var stap_target = 0f
+
+        if (!preferences.get(BooleanKey.stappenAanUit)) {
+            log_Stappen += " → resistentie aan/uit: uit " + "\n"
+            return Stappen_class(stap_perc,stap_target,log_Stappen)
+        }
+
+        val now = System.currentTimeMillis()
+        val timeMillis5 = now - 5 * 60 * 1000 // 5 minutes en millisecondes
+        val timeMillis30 = now - 30 * 60 * 1000 // 30 minutes en millisecondes
+        val timeMillis180 = now - 180 * 60 * 1000 // 180 minutes en millisecondes
+
+        val allStepsCounts = persistenceLayer.getStepsCountFromTimeToTime(timeMillis180, now)
+
+        var recentSteps5Minutes = 1
+        var recentSteps30Minutes = 1
+
+        if (preferences.get(BooleanKey.stappenAanUit)) {
+            allStepsCounts.forEach { stepCount ->
+                val timestamp = stepCount.timestamp
+                if (timestamp >= timeMillis5) {
+                    recentSteps5Minutes = stepCount.steps5min
+                }
+                if (timestamp >= timeMillis30) {
+                    recentSteps30Minutes = stepCount.steps30min
+                }
+            }
+        }
+
+        val min5Stap = preferences.get(IntKey.stap_5minuten)
+        val min30Stap = ((min5Stap * 30 / 5)/1.6).toInt()
+
+
+// Variabelen om de actieve duur en huidige status bij te houden
+        val thresholds = mapOf(
+            " 5 minuten" to min5Stap,
+            "30 minuten" to min30Stap  //,
+
+        )
+        var allThresholdsMet = true
+
+        // Controleer de drempels
+        thresholds.forEach { (label, threshold) ->
+            val steps = when (label) {
+                " 5 minuten" -> recentSteps5Minutes
+                "30 minuten" -> recentSteps30Minutes
+
+                else -> 0
+            }
+            log_Stappen += " ● $label: $steps stappen ${if (steps >= threshold) ">= drempel ($threshold)" else "< drempel ($threshold)"}\n"
+            if (steps < threshold) allThresholdsMet = false
+        }
+
+        if (allThresholdsMet) {
+            StapRetentie = (StapRetentie + 1).coerceAtMost(preferences.get(IntKey.stap_retentie)) // Limiteer
+            log_Stappen += " ↗ Drempel overschreden. ($StapRetentie maal).\n"
+        } else {
+            log_Stappen += " → Drempel niet overschreden.\n"
+            if (StapRetentie > 0) {
+                StapRetentie = StapRetentie -1
+
+            } // Verlaag actieve duur als deze nog actief is
+        }
+
+        // Verhoog target
+        if (StapRetentie > 0) {
+            if (allThresholdsMet) {
+                stap_perc = preferences.get(IntKey.stap_activiteteitPerc).toFloat()
+                log_Stappen += " ● Overschrijding drempels → Insuline perc. $stap_perc %.\n"
+                stap_target = 36f
+            } else {
+                stap_perc = preferences.get(IntKey.stap_activiteteitPerc).toFloat()
+                log_Stappen += " ● nog $StapRetentie * retentie → Insuline perc. $stap_perc %.\n"
+                stap_target = 36f
+            }
+        } else {
+            stap_perc = 100f
+            log_Stappen += " ● Geen activiteit → Insuline perc. $stap_perc %.\n"
+        }
+
+        //   val display_Stap_perc = stap_perc.toInt()
+
+
+        return Stappen_class(stap_perc,stap_target,log_Stappen)
+
+    }
+
+    fun Persistent(): Persistent_class {
+        var log_Persistent = " ﴿ Persistent hoog ﴾" + "\n"
+        var Persistent_ISF_cf = 1.0
+        if (!preferences.get(BooleanKey.PersistentAanUit)) {
+            log_Persistent += " → persistent uitgeschakeld " + "\n"
+            return Persistent_class(Persistent_ISF_cf,log_Persistent)
+        }
+
+
+        val startTime = dateUtil.now() -  T.mins(min = 50).msecs()     //T.hours(hour = 1).msecs()
+        val endTime = dateUtil.now()
+        val bgReadings = persistenceLayer.getBgReadingsDataFromTimeToTime(startTime, endTime, false)
+        var delta15 = 0.0
+        //    var delta15_oud = 0.0
+        var bg_act = round(bgReadings[0].value/18,2)
+        var delta5 = 0f
+        var delta30 = 0f
+        if (bgReadings.size >= 7) {
+            delta15 = (bgReadings[0].value - bgReadings[3].value)
+            //       delta15_oud = (bgReadings[1].value - bgReadings[4].value)
+            bg_act = round(bgReadings[0].value/18,2)
+            delta5 = (bgReadings[0].value - bgReadings[1].value).toFloat()
+            delta30 = (bgReadings[0].value - bgReadings[6].value).toFloat()
+        }
+
+        var Persistent_ISF_perc: Double
+        val Display_Persistent_perc: Int
+        val Persistent_Drempel: Double
+        val extraNachtrange: Double
+        val Max_Persistent_perc: Int
+
+        val DeelvanDag: String
+        if (!Nacht()) {
+            Persistent_Drempel = preferences.get(DoubleKey.persistent_Dagdrempel)
+            Max_Persistent_perc = preferences.get(IntKey.Dag_MaxPersistentPerc)
+            extraNachtrange = 0.0
+            DeelvanDag = "overdag"
+        } else {
+            Persistent_Drempel = preferences.get(DoubleKey.persistent_Nachtdrempel)
+            Max_Persistent_perc = preferences.get(IntKey.Nacht_MaxPersistentPerc)
+            extraNachtrange = 0.5
+            DeelvanDag = "'s nachts"
+        }
+
+
+        val Pers_grensL = (preferences.get(DoubleKey.persistent_grens) * 18) - extraNachtrange
+        val Pers_grensH = (preferences.get(DoubleKey.persistent_grens) * 18) + 2 + extraNachtrange
+
+        if (delta5>-Pers_grensL && delta5<Pers_grensH && delta15>-Pers_grensL-1 && delta15<Pers_grensH+1 && delta30>-Pers_grensL-2 && delta30<Pers_grensH+2 && bg_act > Persistent_Drempel) {
+            Persistent_ISF_perc = (((bg_act - Persistent_Drempel ) / 10.0) + 1.0) * 100 * 1.05
+            Persistent_ISF_perc = Persistent_ISF_perc.coerceIn(100.0, Max_Persistent_perc.toDouble())
+            Display_Persistent_perc = Persistent_ISF_perc.toInt()
+            log_Persistent += " → Persistent hoge Bg gedetecteerd" + "\n"
+            log_Persistent +=  " ● " + DeelvanDag + " → Drempel = " + round(Persistent_Drempel,1) + "\n"
+            log_Persistent +=  " ● Bg= " + round(bg_act, 1) + " → Insuline perc = " + Display_Persistent_perc + "%" + "\n"
+
+
+        } else {
+            Persistent_ISF_perc = 100.0
+            log_Persistent +=  " ● geen Persistent hoge Bg gedetecteerd" + "\n"
+            log_Persistent +=  " ● " + DeelvanDag + " → Drempel = " + round(Persistent_Drempel,1) + "\n"
+
+        }
+        Persistent_ISF_cf = Persistent_ISF_perc /100
+        return Persistent_class(Persistent_ISF_cf,log_Persistent)
+
+    }
+
+    fun ActExtraIns(): Extra_Insuline {
+
+        val tijdNu = System.currentTimeMillis()/(60 * 1000)
+        var extra_insuline_tijdstip = "0"
+        var extra_insuline_tijd = "0"
+        var extra_insuline_percentage = "0"
+        val extra_insuline: Boolean
+        val corr_factor: Float
+        val Cf_overall: Float
+        val Cf_tijd : Double
+        var log_ExtraIns : String
+
+        var extra_insuline_check = "0"
+
+        try {
+            val sc = Scanner(ActExtraIns)
+            var teller = 1
+            while (sc.hasNextLine()) {
+                val line = sc.nextLine()
+                if (teller == 1) { extra_insuline_check = line}
+                if (teller == 2) { extra_insuline_tijdstip = line}
+                if (teller == 3) { extra_insuline_tijd = line}
+                if (teller == 4) { extra_insuline_percentage = line}
+
+                teller += 1
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        val verstreken_tijd = (tijdNu - extra_insuline_tijdstip.toFloat()).toInt()
+        var resterendeTijd = extra_insuline_tijd.toInt() - verstreken_tijd
+        var cf:Double
+
+        if (verstreken_tijd < extra_insuline_tijd.toInt() && extra_insuline_check == "checked") {
+            extra_insuline = true
+            corr_factor = (extra_insuline_percentage.toFloat()/100)
+
+            val Max_Cf_tijd = 1.0 + 0.2
+            val Min_Cf_tijd = 1.0 - 0.2
+            val Offset_tijd = extra_insuline_tijd.toFloat()/2 + 10
+            val Slope_tijd = 3
+            Cf_tijd = Min_Cf_tijd + (Max_Cf_tijd - Min_Cf_tijd)/(1 + Math.pow((verstreken_tijd.toDouble() / Offset_tijd) , Slope_tijd.toDouble()))
+
+            Cf_overall = round(corr_factor * Cf_tijd,2).toFloat()
+            cf = Cf_overall.toDouble()
+
+            val info_cf = (cf * 100).toInt()
+            log_ExtraIns = " \n" + " ﴿ Extra bolus insuline  ―――――﴾" + "\n"
+            log_ExtraIns +=  " → Nog $resterendeTijd minuten resterend" + "\n"
+            log_ExtraIns +=  " ● Opgegeven perc = " + extra_insuline_percentage + "%" + "\n"
+            log_ExtraIns +=  " ● Dynamische factor = " + round(Cf_tijd,2) + "\n"
+            log_ExtraIns +=  " ● Overall perc = $info_cf%" + "\n"
+        } else {
+            extra_insuline = false
+            cf = 1.0
+
+            log_ExtraIns = " \n" + " ﴿ Extra bolus insuline  ―――――﴾" + "\n"
+            log_ExtraIns +=  " ● Niet actief " + "\n"
+
+        }
+
+
+        return Extra_Insuline(extra_insuline,cf,log_ExtraIns)
+    }
+
+    fun BolusViaBasaal(): Bolus_Basaal {
+
+        val tijdNu = System.currentTimeMillis()/(60 * 1000)
+        var bolus_basaal_check = "0"
+        var bolus_basaal_tijdstip = "0"
+        var bolus_basaal_tijd = "0"
+        var insuline = "0"
+
+
+        val temp_basaal: Float
+
+
+        try {
+            val sc = Scanner(BolusViaBasaal)
+            var teller = 1
+            while (sc.hasNextLine()) {
+                val line = sc.nextLine()
+                if (teller == 1) { bolus_basaal_check = line}
+                if (teller == 2) { bolus_basaal_tijdstip = line}
+                if (teller == 3) { bolus_basaal_tijd = line}
+                if (teller == 4) { insuline = line}
+
+                teller += 1
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
+        val rest_tijd = bolus_basaal_tijd.toInt() - verstreken_tijd_bolus
+        if (verstreken_tijd_bolus <= ((bolus_basaal_tijd.toInt())+1) && bolus_basaal_check == "checked") {
+            bolus_via_basaal = true
+            temp_basaal = insuline.toFloat() * 60 / bolus_basaal_tijd.toFloat()
+
+        } else {
+            bolus_via_basaal = false
+            temp_basaal = 0.0f
+        }
+
+
+
+        return Bolus_Basaal(bolus_via_basaal,temp_basaal,rest_tijd.toFloat())
+
+    }
+
     fun determine_basal(
         glucose_status: GlucoseStatus, currenttemp: CurrentTemp, iob_data_array: Array<IobTotal>, profile: OapsProfile, autosens_data: AutosensResult, meal_data: MealData,
         microBolusAllowed: Boolean, currentTime: Long, flatBGsDetected: Boolean, dynIsfMode: Boolean
@@ -191,8 +781,28 @@ class DetermineBasalSMB @Inject constructor(
             consoleError = consoleError
         )
 
+        val (bolus_basaal_AanUit,bolus_basaal_waarde, rest_tijd_basaal) = BolusViaBasaal()
+        val (extraIns_AanUit,extraIns_Factor,log_ExtraIns) = ActExtraIns()
+
+
+
         // TODO eliminate
         val deliverAt = currentTime
+        if (bolus_basaal_AanUit) {
+            var new_basaal = round_basal(bolus_basaal_waarde.toDouble())
+            // consoleError.add(" ﴿―― Bolus via basaal ――﴾")
+            // consoleError.add(" → basaal: " + round(new_basaal,2) + "(u/h)")
+            // consoleError.add(" → nog $rest_tijd_basaal minuten resterend")
+            // consoleError.add(" ﴿―――――――――――――――﴾")
+
+            rT.reason.append("=> Insuline via basaal:  $bolus_basaal_waarde u/h nog $rest_tijd_basaal minuten resterend")
+            rT.deliverAt = deliverAt
+            rT.duration = 30
+            rT.rate = new_basaal
+            return rT
+        }
+
+
 
         // TODO eliminate
         val profile_current_basal = round_basal(profile.current_basal)
@@ -246,6 +856,7 @@ class DetermineBasalSMB @Inject constructor(
         var min_bg = profile.min_bg
         var max_bg = profile.max_bg
 
+
         var sensitivityRatio: Double
         val high_temptarget_raises_sensitivity = profile.exercise_mode || profile.high_temptarget_raises_sensitivity
         val normalTarget = 100 // evaluate high/low temptarget against 100, not scheduled target (which might change)
@@ -257,6 +868,17 @@ class DetermineBasalSMB @Inject constructor(
             consoleError(" Dynamic ISF version 2.0 ")
             consoleError("---------------------------------------------------------")
         }
+
+        val (resistentie_factor,log_res) = Resistentie()
+        val (persistent_factor,log_persistent) = Persistent()
+        val (stap_perc,stap_target,log_stappen) = Stappen()
+
+        consoleLog(log_res)
+        consoleLog(log_persistent)
+        consoleLog(log_stappen)
+        consoleLog(log_ExtraIns)
+
+
 
         if (high_temptarget_raises_sensitivity && profile.temptargetSet && target_bg > normalTarget
             || profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && target_bg < normalTarget
@@ -272,12 +894,19 @@ class DetermineBasalSMB @Inject constructor(
             consoleLog("Sensitivity ratio set to $sensitivityRatio based on temp target of $target_bg; ")
         } else {
             sensitivityRatio = autosens_data.ratio
-            consoleLog("Autosens ratio: $sensitivityRatio; ")
+            //   consoleLog("Autosens ratio: $sensitivityRatio; ")
         }
+
+        sensitivityRatio = resistentie_factor
+
+
+
         basal = profile.current_basal * sensitivityRatio
         basal = round_basal(basal)
+        val txtProfileBasal = round(profile_current_basal,2)
+        val txtBasal = round(basal,2)
         if (basal != profile_current_basal)
-            consoleLog("Adjusting basal from $profile_current_basal to $basal; ")
+            consoleLog("Adjusting basal from $txtProfileBasal to $txtBasal; ")
         else
             consoleLog("Basal unchanged: $basal; ")
 
@@ -300,6 +929,7 @@ class DetermineBasalSMB @Inject constructor(
                 target_bg = new_target_bg
             }
         }
+        target_bg += stap_target
 
         val iobArray = iob_data_array
         val iob_data = iobArray[0]
@@ -315,20 +945,33 @@ class DetermineBasalSMB @Inject constructor(
         val minAvgDelta = min(glucose_status.shortAvgDelta, glucose_status.longAvgDelta)
         val maxDelta = max(glucose_status.delta, max(glucose_status.shortAvgDelta, glucose_status.longAvgDelta))
 
-        val sens =
+        var sens =
             if (dynIsfMode) profile.variable_sens
             else {
                 val profile_sens = round(profile.sens, 1)
-                val adjusted_sens = round(profile.sens / sensitivityRatio, 1)
+                var adjusted_sens = round(profile.sens / sensitivityRatio, 1)
                 if (adjusted_sens != profile_sens) {
-                    consoleLog("ISF from $profile_sens to $adjusted_sens")
+                    consoleLog("ISF van " + round(profile_sens/18,1) + " naar " + round(adjusted_sens/18,1) + "\n")
+                    //    consoleLog("ISF from $profile_sens to $adjusted_sens")
                 } else {
-                    consoleLog("ISF unchanged: $adjusted_sens")
+                    consoleLog("ISF onveranderd: " + round(adjusted_sens/18,1) + "\n")
+                    //    consoleLog("ISF unchanged: $adjusted_sens")
                 }
+
                 adjusted_sens
-                //console.log(" (autosens ratio "+sensitivityRatio+")");
+
             }
-        consoleError("CR:${profile.carb_ratio}")
+        if (extraIns_AanUit) {
+            sens = sens / extraIns_Factor
+        }
+        if (preferences.get(BooleanKey.stappenAanUit)) {
+            sens = sens / (stap_perc/100)
+        }
+        if (preferences.get(BooleanKey.PersistentAanUit)) {
+            sens = sens / (persistent_factor)
+        }
+
+        // consoleError("CR:${profile.carb_ratio}")
 
         //calculate BG impact: the amount BG "should" be rising or falling based on insulin activity alone
         val bgi = round((-iob_data.activity * sens * 5), 2)
@@ -412,7 +1055,7 @@ class DetermineBasalSMB @Inject constructor(
             sensitivityRatio = sensitivityRatio, // autosens ratio (fraction of normal basal)
             consoleLog = consoleLog,
             consoleError = consoleError,
-            variable_sens = profile.variable_sens
+            variable_sens = sens  //profile.variable_sens
         )
 
         // TSUNAMI CALCULATION:
@@ -448,17 +1091,7 @@ class DetermineBasalSMB @Inject constructor(
         // ISF (mg/dL/U) / CR (g/U) = CSF (mg/dL/g)
 
         // TODO: remove commented-out code for old behavior
-        //if (profile.temptargetSet) {
-        // if temptargetSet, use unadjusted profile.sens to allow activity mode sensitivityRatio to adjust CR
-        //var csf = profile.sens / profile.carb_ratio;
-        //} else {
-        // otherwise, use autosens-adjusted sens to counteract autosens meal insulin dosing adjustments
-        // so that autotuned CR is still in effect even when basals and ISF are being adjusted by autosens
-        //var csf = sens / profile.carb_ratio;
-        //}
-        // use autosens-adjusted sens to counteract autosens meal insulin dosing adjustments so that
-        // autotuned CR is still in effect even when basals and ISF are being adjusted by TT or autosens
-        // this avoids overdosing insulin for large meals when low temp targets are active
+
         val csf = sens / profile.carb_ratio
         consoleError("profile.sens: ${profile.sens}, sens: $sens, CSF: $csf")
 
@@ -470,7 +1103,7 @@ class DetermineBasalSMB @Inject constructor(
             ci = maxCI
         }
         var remainingCATimeMin = 3.0 // h; duration of expected not-yet-observed carb absorption
-        // adjust remainingCATime (instead of CR) for autosens if sensitivityRatio defined
+
         remainingCATimeMin = remainingCATimeMin / sensitivityRatio
         // 20 g/h means that anything <= 60g will get a remainingCATimeMin, 80g will get 4h, and 120g 6h
         // when actual absorption ramps up it will take over from remainingCATime
@@ -615,13 +1248,13 @@ class DetermineBasalSMB @Inject constructor(
             //console.error(predBGI, predCI, predUCI);
             // truncate all BG predictions at 4 hours
             if (IOBpredBGs.size < 48) IOBpredBGs.add(IOBpredBG)
-            if (COBpredBGs.size < 48) COBpredBGs.add(COBpredBG)
-            if (aCOBpredBGs.size < 48) aCOBpredBGs.add(aCOBpredBG)
-            if (UAMpredBGs.size < 48) UAMpredBGs.add(UAMpredBG)
+            if (COBpredBGs.size < 48) COBpredBGs.add(COBpredBG!!)
+            if (aCOBpredBGs.size < 48) aCOBpredBGs.add(aCOBpredBG!!)
+            if (UAMpredBGs.size < 48) UAMpredBGs.add(UAMpredBG!!)
             if (ZTpredBGs.size < 48) ZTpredBGs.add(ZTpredBG)
             // calculate minGuardBGs without a wait from COB, UAM, IOB predBGs
-            if (COBpredBG < minCOBGuardBG) minCOBGuardBG = round(COBpredBG).toDouble()
-            if (UAMpredBG < minUAMGuardBG) minUAMGuardBG = round(UAMpredBG).toDouble()
+            if (COBpredBG!! < minCOBGuardBG) minCOBGuardBG = round(COBpredBG!!).toDouble()
+            if (UAMpredBG!! < minUAMGuardBG) minUAMGuardBG = round(UAMpredBG!!).toDouble()
             if (IOBpredBG < minIOBGuardBG) minIOBGuardBG = IOBpredBG
             if (ZTpredBG < minZTGuardBG) minZTGuardBG = round(ZTpredBG, 0)
 
@@ -637,9 +1270,9 @@ class DetermineBasalSMB @Inject constructor(
             if (IOBpredBGs.size > insulinPeak5m && (IOBpredBG < minIOBPredBG)) minIOBPredBG = round(IOBpredBG, 0)
             if (IOBpredBG > maxIOBPredBG) maxIOBPredBG = IOBpredBG
             // wait 85-105m before setting COB and 60m for UAM minPredBGs
-            if ((cid != 0.0 || remainingCIpeak > 0) && COBpredBGs.size > insulinPeak5m && (COBpredBG < minCOBPredBG)) minCOBPredBG = round(COBpredBG, 0)
-            if ((cid != 0.0 || remainingCIpeak > 0) && COBpredBG > maxIOBPredBG) maxCOBPredBG = COBpredBG
-            if (enableUAM && UAMpredBGs.size > 12 && (UAMpredBG < minUAMPredBG)) minUAMPredBG = round(UAMpredBG, 0)
+            if ((cid != 0.0 || remainingCIpeak > 0) && COBpredBGs.size > insulinPeak5m && (COBpredBG!! < minCOBPredBG)) minCOBPredBG = round(COBpredBG!!, 0)
+            if ((cid != 0.0 || remainingCIpeak > 0) && COBpredBG!! > maxIOBPredBG) maxCOBPredBG = COBpredBG!!
+            if (enableUAM && UAMpredBGs.size > 12 && (UAMpredBG!! < minUAMPredBG)) minUAMPredBG = round(UAMpredBG!!, 0)
             //if (enableUAM && UAMpredBG!! > maxIOBPredBG) maxUAMPredBG = UAMpredBG!!
         }
         // set eventualBG to include effect of carbs
@@ -1241,11 +1874,11 @@ class DetermineBasalSMB @Inject constructor(
         // TSUNAMI ACTIVITY ENGINE START  MP
         //------------------------------- MP
 
-        // Settings: 
+        // Settings:
         val enableWaveMode = preferences.get(BooleanKey.ApsWaveEnable)
         val waveInsReqPct = preferences.get(DoubleKey.ApsWaveInsReqPct)
-        var startTime = preferences.get(IntKey.ApsWaveStartTime).toDouble()
-        var endTime = preferences.get(IntKey.ApsWaveEndTime).toDouble()
+        //    var startTime = preferences.get(IntKey.ApsWaveStartTime).toDouble()
+        //    var endTime = preferences.get(IntKey.ApsWaveEndTime).toDouble()
         val maxWaveSMBBasalMinutes = preferences.get(IntKey.ApsWaveMaxMinutesOfBasalToLimitSmb)
         val waveUseSMBCap = preferences.get(BooleanKey.ApsWaveUseSMBCap)
         val waveSMBCap = preferences.get(DoubleKey.ApsWaveSmbCap)
@@ -1268,18 +1901,18 @@ class DetermineBasalSMB @Inject constructor(
             return TsunamiResult(0.0, 0.0, false, StringBuilder())
         }
 
-        val currentHour = LocalTime.now().hour
-        var referenceTimer = currentHour.toDouble()
+        //     val currentHour = LocalTime.now().hour
+        //     var referenceTimer = currentHour.toDouble()
         // active hours redefinition (allowing end times < start times)
-        if (endTime < startTime) {
-            referenceTimer = if (currentHour < startTime) {
-                currentHour - startTime + 24 //MP: Transformed timer, counting from (24 - startTime) until 23
-            } else {
-                currentHour - startTime //MP: Transformed timer, counting from 0 until (23 - startTime)
-            }
-            endTime = 24 - (startTime - endTime) //MP: Transformed end hour, represents total duration of active hours in hours
-            startTime = 0.0 //MP: Set starting hour to 0 and transform the rest
-        }
+        //     if (endTime < startTime) {
+        //         referenceTimer = if (currentHour < startTime) {
+        //             currentHour - startTime + 24 //MP: Transformed timer, counting from (24 - startTime) until 23
+        //         } else {
+        //             currentHour - startTime //MP: Transformed timer, counting from 0 until (23 - startTime)
+        //         }
+        //         endTime = 24 - (startTime - endTime) //MP: Transformed end hour, represents total duration of active hours in hours
+        //         startTime = 0.0 //MP: Set starting hour to 0 and transform the rest
+        //     }
 
         var SMBcap = if (waveUseSMBCap) {
             waveSMBCap
@@ -1350,8 +1983,10 @@ class DetermineBasalSMB @Inject constructor(
         var activityControllerActive = false
         val reason: StringBuilder = StringBuilder()
         //MP Enable TAE SMB sizing if the safety conditions are all met
-        if (referenceTimer >= startTime &&
-            referenceTimer <= endTime &&
+
+        if (WaveActief() &&
+            //referenceTimer >= startTime &&
+            //referenceTimer <= endTime &&
             glucose_status.delta >= 4.1 &&
             bg >= target_bg &&
             iob_data.iob > 0.1 &&
@@ -1416,7 +2051,8 @@ class DetermineBasalSMB @Inject constructor(
             consoleLog("WAVE STATUS")
             consoleLog("------------------------------")
             consoleLog("TAE bypassed - reasons:")
-            if (referenceTimer < startTime || referenceTimer > endTime) {
+            //   if (referenceTimer < startTime || referenceTimer > endTime) {
+            if (!WaveActief()) {
                 consoleLog("Outside active hours.")
             }
             if (glucose_status.delta <= 4.1) {

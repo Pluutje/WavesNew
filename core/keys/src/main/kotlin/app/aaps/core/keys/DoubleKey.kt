@@ -53,4 +53,13 @@ enum class DoubleKey(
     InsulinPDFreePeakA0("insulin_pd_free_peak_a0", 61.33, 10.0, 120.0),
     InsulinPDFreePeakA1("insulin_pd_free_peak_a1", 12.27, 3.0, 20.0),
     InsulinPDFreePeakB1("insulin_pd_free_peak_b1", 0.05185, 0.02, 0.1),
+
+//  Eigen
+
+    Dag_resistentie_target("Dag_resistentie_target", 5.2,4.0,8.0),
+    Nacht_resistentie_target("Dacht_resistentie_target", 5.2,4.0,8.0),
+    Uren_resistentie("Uren_resistentie", 2.5,1.0,5.0),
+    persistent_Dagdrempel("persistent_Dagdrempel", 8.5,7.0,12.0),
+    persistent_Nachtdrempel("persistent_Nachtdrempel",7.0,6.0,10.0),
+    persistent_grens("persistent_grens",0.5,0.1, 1.0),
 }

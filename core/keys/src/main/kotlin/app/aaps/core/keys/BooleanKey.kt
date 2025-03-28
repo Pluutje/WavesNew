@@ -115,4 +115,10 @@ enum class BooleanKey(
     WearCustomWatchfaceAuthorization(key = "wear_custom_watchface_autorization", defaultValue = false),
     WearNotifyOnSmb(key = "wear_notifySMB", defaultValue = true),
     WearBroadcastData(key = "wear_broadcast_data", defaultValue = false),
+
+    //  Eigen
+    Resistentie("Resistentie",true),
+    stappenAanUit("stappenAanUit",true),
+    PersistentAanUit("PersistentAanUit",true),
+    stappenHorloge("stappenHorloge",true),
 }

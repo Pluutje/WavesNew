@@ -10,8 +10,8 @@ import javax.inject.Singleton
 class SkinLargeDisplay @Inject constructor(private val config: Config) : SkinInterface {
 
     override val description: Int get() = R.string.largedisplay_description
-    override val mainGraphHeight: Int get() = 350
-    override val secondaryGraphHeight: Int get() = 125
+    override val mainGraphHeight: Int get() = 275
+    override val secondaryGraphHeight: Int get() = 58
 
     override fun preProcessLandscapeOverviewLayout(binding: OverviewFragmentBinding, isLandscape: Boolean, isTablet: Boolean, isSmallHeight: Boolean) {
         super.preProcessLandscapeOverviewLayout(binding, isLandscape, isTablet, isSmallHeight)

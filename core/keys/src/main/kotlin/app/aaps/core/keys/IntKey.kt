@@ -71,4 +71,21 @@ enum class IntKey(
     GarminLocalHttpPort("communication_http_port", 28891, 1001, 65535, defaultedBySM = true, hideParentScreenIfHidden = true),
     NsClientAlarmStaleData("ns_alarm_stale_data_value", 16, 15, 120),
     NsClientUrgentAlarmStaleData("ns_alarm_urgent_stale_data_value", 31, 30, 180),
+
+    // eigen
+    Min_resistentiePerc("Min_resistentiePerc", 80,10,100),
+    Max_resistentiePerc("Max_resistentiePerc", 120,100,200),
+    Dag_resistentiePerc("Dag_resistentiePerc", 100,10,200),
+    Nacht_resistentiePerc("Nacht_resistentiePerc", 100,10,200),
+    Dagen_resistentie("Dagen_resistentie", 3,1,7),
+    // Uren_resistentie("Uren_resistentie", 2,1,5),
+
+    stap_activiteteitPerc("stap_activiteteitPerc", 50,10,100),
+    stap_5minuten("stap_5minuten", 200,100,300),
+    stap_retentie("stap_retentie", 6,2,12),
+
+    Dag_MaxPersistentPerc("Dag_MaxPersistentPerc", 120,100,200),
+    Nacht_MaxPersistentPerc("Nacht_MaxPersistentPerc", 120,100,200),
+
+
 }
