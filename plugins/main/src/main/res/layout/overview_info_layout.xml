@@ -423,7 +423,7 @@
         <ImageView
             android:id="@+id/sensitivity_icon"
             android:layout_width="wrap_content"
-            android:layout_height="37dp"
+            android:layout_height="45dp"
             android:layout_gravity="center_horizontal"
             android:contentDescription="@string/a11y_autosens_label"
             app:srcCompat="@drawable/ic_swap_vert_black_48dp_green" />

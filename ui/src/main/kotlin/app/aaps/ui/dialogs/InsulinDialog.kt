@@ -169,6 +169,8 @@ class InsulinDialog : DialogFragmentWithDate() {
                 ?: 25.0, 5.0, 60.0, 5.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
         )
 
+       // binding.editTextInput.text
+
 
         binding.amount.setParams(
             savedInstanceState?.getDouble("amount")
@@ -241,6 +243,7 @@ class InsulinDialog : DialogFragmentWithDate() {
         val unitLabel = if (units == GlucoseUnit.MMOL) rh.gs(app.aaps.core.ui.R.string.mmol) else rh.gs(app.aaps.core.ui.R.string.mgdl)
         val recordOnlyChecked = binding.recordOnly.isChecked
         val eatingSoonChecked = binding.startEatingSoonTt.isChecked
+       // val opmerking = binding.editTextInput.text.toString()
 
         // Eigen input
         val extraInsulineChecked = binding.activeerExtraInsuline.isChecked
@@ -276,7 +279,8 @@ class InsulinDialog : DialogFragmentWithDate() {
             insulinAfterConstraints = 0.0
 
             BolusViaBasaal.writeText("checked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
-            schrijfBolusOverzicht(tijdNu, insuline)
+            val opmerking = binding.editTextInput.text.toString()
+            schrijfBolusOverzicht(insuline, opmerking)
         } else {
             BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
         }
@@ -403,10 +407,10 @@ class InsulinDialog : DialogFragmentWithDate() {
         return true
     }
 
-    fun schrijfBolusOverzicht(tijdNu: String, insuline: String) {
-        val kopregel = "DatumTijd - Bolus"
+    fun schrijfBolusOverzicht( insuline: String, opm: String) {
+        val kopregel = " Datum     Tijd  -  Bolus"
         val tijdact = getFormattedTime()
-        val nieuweRegel = "$tijdact - $insuline eh"
+        val nieuweRegel = "$tijdact - $insuline eh\n  opm: $opm"
 
         val file = BolusOverzicht
 
