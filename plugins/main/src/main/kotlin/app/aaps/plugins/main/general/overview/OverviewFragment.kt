@@ -11,6 +11,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.TypedValue
@@ -113,7 +114,10 @@ import dagger.android.HasAndroidInjector
 import dagger.android.support.DaggerFragment
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
+import java.io.File
+import java.io.IOException
 import java.util.Locale
+import java.util.Scanner
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.abs
@@ -671,11 +675,11 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
 
                         list += event.hashCode()
                     }
-                    if (selectedLayout == binding.buttonsLayout.userButtonsLayout) {
-                        binding.buttonsLayout.userButtonsLayout.visibility = events.isNotEmpty().toVisibility()
-                    } else {
-                        binding.buttonsLayout.userButtonsLayout.visibility = View.GONE
-                    }
+            if (selectedLayout == binding.buttonsLayout.userButtonsLayout) {
+                binding.buttonsLayout.userButtonsLayout.visibility = events.isNotEmpty().toVisibility()
+            } else {
+                binding.buttonsLayout.userButtonsLayout.visibility = View.GONE
+            }
         }
         if (list != lastUserAction) {
             // Synchronize Watch Tiles with overview
@@ -1209,7 +1213,19 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             if (config.APS) request?.variableSens ?: 0.0
             else if (config.AAPSCLIENT) processedDeviceStatusData.getAPSResult()?.variableSens ?: 0.0
             else 0.0
-        val ratioUsed = request?.autosensResult?.ratio ?: 1.0
+
+
+        val externalDir = File(Environment.getExternalStorageDirectory(), "Documents/AAPS/")
+        val resistentieFile = File(externalDir, "ANALYSE/resistentie.txt")
+
+        val ratioFactor: Double = if (resistentieFile.exists()) {
+            resistentieFile.readText().trim().toDouble().div(100)  // Converteer percentage naar factor
+        } else {
+            1.0  // Voorkomt een crash als het bestand niet bestaat
+        }
+
+        // val ratioUsed = request?.autosensResult?.ratio ?: 1.0
+        val ratioUsed = ratioFactor
 
         if (variableSens != isfMgdl && variableSens != 0.0 && isfMgdl != null) {
             val okDialogText: ArrayList<String> = ArrayList()
@@ -1246,11 +1262,24 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         } else {
             binding.infoLayout.sensitivity.text =
                 lastAutosensData?.let {
-                    rh.gs(app.aaps.core.ui.R.string.autosens_short, it.autosensResult.ratio * 100)
+                    //   rh.gs(app.aaps.core.ui.R.string.autosens_short, it.autosensResult.ratio * 100)
+                    rh.gs(app.aaps.core.ui.R.string.autosens_short, ratioFactor * 100)
                 } ?: ""
             binding.infoLayout.variableSensitivity.visibility = View.GONE
             binding.infoLayout.sensitivity.visibility = View.VISIBLE
         }
+
+        val overViewText: ArrayList<String> = ArrayList()
+        overViewText.add(rh.gs(app.aaps.core.ui.R.string.autosens_short, ratioUsed*100))
+        overViewText.add(
+            String.format(
+                Locale.getDefault(), "%1$.1f→%2$.1f",
+                profileUtil.fromMgdlToUnits(isfMgdl!!, profileFunction.getUnits()),
+                profileUtil.fromMgdlToUnits(variableSens, profileFunction.getUnits())
+            )
+        )
+        binding.infoLayout.sensitivity.text = overViewText.joinToString("\n")
+        binding.infoLayout.sensitivity.visibility = View.VISIBLE
     }
 
     private fun updatePumpStatus() {

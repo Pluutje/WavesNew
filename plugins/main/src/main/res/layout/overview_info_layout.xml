@@ -423,7 +423,7 @@
         <ImageView
             android:id="@+id/sensitivity_icon"
             android:layout_width="wrap_content"
-            android:layout_height="45dp"
+            android:layout_height="31dp"
             android:layout_gravity="center_horizontal"
             android:contentDescription="@string/a11y_autosens_label"
             app:srcCompat="@drawable/ic_swap_vert_black_48dp_green" />
@@ -435,12 +435,11 @@
             android:gravity="center_horizontal"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
-            tools:text="n/a"
             android:textAppearance="@style/TextAppearance.AppCompat.Medium"
-            android:textStyle="bold"
             android:textColor="#28A9E9"
             android:textSize="16sp"
-            tools:ignore="HardcodedText" />
+            tools:ignore="HardcodedText"
+            tools:text="100%" />
 
         <TextView
             android:id="@+id/variable_sensitivity"
