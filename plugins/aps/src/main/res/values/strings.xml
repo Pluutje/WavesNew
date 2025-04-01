@@ -268,8 +268,12 @@
 
 
 
-    <string name="Info_Bg">1. Dynamische Bg: \n ● correctie sterkte instelbaar tussen 75% en 125%. \n 2. Persistent hoge Bg: \n ● Drempelwaarde waaronder nooit een persitent hoge Bg wordt gedetecteerd \n ● Range (+/- in mmol/l) waarbinnen de Bg als stabiel wordt beschouwd.\n 3. Hypo correctie uitgevoerd als bg onder target komt \n\n !! Klik om te openen !!\n</string>
-    <string name="a_bg_doc" translatable="false">https://docs.google.com/document/d/12nn-5wnnbqTLOE00fwe8mANcpMUW8T4H/edit</string>
+    <string name="Info_Waves">\n ● Algemene Info \n  \n ● ------- \n ● ---------\n \n\n !! Klik om te openen !!\n</string>
+    <string name="Algoritme_algemeen_doc" translatable="false">https://docs.google.com/document/d/1276w2FhhqaGFjAccH8VlHJ0csGTDxkm1/edit?tab=t.0</string>
+
+
+
+    <string name="a_algemeen_doc" translatable="false">https://docs.google.com/document/d/12nn-5wnnbqTLOE00fwe8mANcpMUW8T4H/edit</string>
     <string name="Info_activiteit">● Activiteits instellingen gebasserd op stappen!:\n 1. Stappenteller aan/uit schakelen.\n 2. Insuline percentage bij gedetecteerde activiteit.\n \n !! Klik om te openen !!\n</string>
     <string name="b_stappen_doc" translatable="false">https://docs.google.com/document/d/12gcpIZ9B-TC0vAnB9XH_55IpHAuePFSV/edit</string>
     <string name="Info_UAMBoost">● UAM Boost instellingen!:\n 1. ∆15 groter dan drempelwaarde geeft boostpercentage op de insuline.\n 2. Het basis boost percentage wordt toegepast en gecorrigeerd voor de Bg en de ∆15.\n \n !! Klik om te openen !!\n</string>
@@ -285,7 +289,7 @@
     <string name="Info_note_boost">Info tbv Automatisering Note-boost aanpassingen!\n 1. Via automatisering en gebruikers actie wordt een mode gekozen. \n 2. Laag, Middel, Hoog koolhydraat of Stop. Het ingestelde Boost-% wordt tijdens de loopttijd toegepast.\n 3. Tevens wordt aan de start een extra SMB gegeven.\n \n !! Klik om te openen !!\n</string>
     <string name="g_note_boost_doc" translatable="false">https://docs.google.com/document/d/13lPl9WChpcA5mbfXRdtsC0fT18HHaNL1/edit</string>
     <string name="Info_algemeen">Algemene instellingen!\n 1. Tijdstip warop de dagstart en eindigt. \n 2. .......\n 3. ..........\n \n !! Klik om te openen !!\n</string>
-    <string name="h_algemeen_doc" translatable="false">https://docs.google.com/document/d/13lPl9WChpcA5mbfXRdtsC0fT18HHaNL1/edit</string>
+    <string name="persistent_doc" translatable="false">https://docs.google.com/document/d/13lPl9WChpcA5mbfXRdtsC0fT18HHaNL1/edit</string>
     <string name="Info_Persistent">﴿. Persistente Bg: \n 1. Drempelwaarde dag/nacht (mmol/l) \n ●  Waarde waaronder geen persistent hoge Bg wordt gedecteerd. \n 2. Maximum percentage dag/nacht. (%) \n 3. Range (mmol/l) \n ● Range (+/- in mmol/l) waarbinnen de Bg als stabiel wordt beschouwd.\n \n\n !! Klik om te openen !!\n</string>
 
 

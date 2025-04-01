@@ -197,11 +197,12 @@ open class OpenAPSSMBPlugin @Inject constructor(
         val smbAlwaysEnabled = preferences.get(BooleanKey.ApsUseSmbAlways)
         val uamEnabled = preferences.get(BooleanKey.ApsUseUam)
         val advancedFiltering = activePlugin.activeBgSource.advancedFilteringSupported()
-        val autoSensOrDynIsfSensEnabled = if (preferences.get(BooleanKey.ApsUseDynamicSensitivity)) {
-            preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity)
-        } else {
-            preferences.get(BooleanKey.ApsUseAutosens)
-        }
+     //   val autoSensOrDynIsfSensEnabled = if (preferences.get(BooleanKey.ApsUseDynamicSensitivity)) {
+     //       preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity)
+     //   } else {
+     //       preferences.get(BooleanKey.ApsUseAutosens)
+     //   }
+        val autoSensOrDynIsfSensEnabled = false
 
         preferenceFragment.findPreference<SwitchPreference>(BooleanKey.ApsUseSmbAlways.key)?.isVisible = smbEnabled && advancedFiltering
         preferenceFragment.findPreference<SwitchPreference>(BooleanKey.ApsUseSmbWithCob.key)?.isVisible = smbEnabled && !smbAlwaysEnabled && advancedFiltering || smbEnabled && !advancedFiltering
@@ -339,7 +340,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
         // End of check, start gathering data
 
-        val dynIsfMode = preferences.get(BooleanKey.ApsUseDynamicSensitivity) && hardLimits.checkHardLimits(preferences.get(IntKey.ApsDynIsfAdjustmentFactor).toDouble(), R.string.dyn_isf_adjust_title, IntKey.ApsDynIsfAdjustmentFactor.min.toDouble(), IntKey.ApsDynIsfAdjustmentFactor.max.toDouble())
+   //     val dynIsfMode = preferences.get(BooleanKey.ApsUseDynamicSensitivity) && hardLimits.checkHardLimits(preferences.get(IntKey.ApsDynIsfAdjustmentFactor).toDouble(), R.string.dyn_isf_adjust_title, IntKey.ApsDynIsfAdjustmentFactor.min.toDouble(), IntKey.ApsDynIsfAdjustmentFactor.max.toDouble())
+        val dynIsfMode = false
         val smbEnabled = preferences.get(BooleanKey.ApsUseSmb)
         val advancedFiltering = constraintsChecker.isAdvancedFilteringEnabled().also { inputConstraints.copyReasons(it) }.value()
 
@@ -567,10 +569,12 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 value.set(false, rh.gs(R.string.autosens_disabled_in_preferences), this)
         } else {
             // SMB mode
-            val enabled = preferences.get(BooleanKey.ApsUseAutosens)
+          //  val enabled = preferences.get(BooleanKey.ApsUseAutosens)
+            val enabled = false
             if (!enabled) value.set(false, rh.gs(R.string.autosens_disabled_in_preferences), this)
         }
         return value
+
     }
 
     override fun configuration(): JSONObject =
@@ -591,6 +595,16 @@ open class OpenAPSSMBPlugin @Inject constructor(
         category.apply {
             key = "openapssmb_settings"
             title = rh.gs(R.string.openapssmb)
+
+            addPreference(
+                AdaptiveIntentPreference(
+                    ctx = context,
+                    intentKey = IntentKey.ApsLinkToDocs,
+                    intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.Algoritme_algemeen_doc)) },
+                    summary = R.string.Info_Waves
+                )
+            )
+
             initialExpandedChildrenCount = 0
             addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsMaxBasal, dialogMessage = R.string.openapsma_max_basal_summary, title = R.string.openapsma_max_basal_title))
             addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsSmbMaxIob, dialogMessage = R.string.openapssmb_max_iob_summary, title = R.string.openapssmb_max_iob_title))
@@ -652,7 +666,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
                     AdaptiveIntentPreference(
                         ctx = context,
                         intentKey = IntentKey.ApsLinkToDocs,
-                        intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.a_bg_doc)) },
+                        intent = Intent().apply { action = Intent.ACTION_VIEW; data = Uri.parse(rh.gs(R.string.persistent_doc)) },
                         summary = R.string.Info_Persistent
                     )
                 )
@@ -685,8 +699,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
             })
 
-            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicSensitivity, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
-            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseAutosens, title = R.string.openapsama_use_autosens))
+        //    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicSensitivity, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
+        //    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseAutosens, title = R.string.openapsama_use_autosens))
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynIsfAdjustmentFactor, dialogMessage = R.string.dyn_isf_adjust_summary, title = R.string.dyn_isf_adjust_title))
             addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsLgsThreshold, dialogMessage = R.string.lgs_threshold_summary, title = R.string.lgs_threshold_title))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynIsfAdjustSensitivity, summary = R.string.dynisf_adjust_sensitivity_summary, title = R.string.dynisf_adjust_sensitivity))

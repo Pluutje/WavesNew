@@ -65,7 +65,7 @@ class DetermineBasalSMB @Inject constructor(
     private val preferences: Preferences,
     private val fabricPrivacy: FabricPrivacy,
     private val dateUtil: DateUtil,
-    //   private val stepsCount: StepsCount,
+    //
 
 ) {
 
