@@ -124,6 +124,16 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+import android.Manifest
+
+import android.content.pm.PackageManager
+
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+
+
+
+
 class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickListener {
 
     @Inject lateinit var injector: HasAndroidInjector
@@ -1174,6 +1184,34 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         binding.progressBar.progress = overviewData.calcProgressPct
     }
 
+    fun getRatioFactor(context: Context): Double {
+        // Controleer of leesrechten zijn verleend
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Vraag de gebruiker om toestemming
+            ActivityCompat.requestPermissions(
+                context as android.app.Activity,
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                REQUEST_CODE_STORAGE_PERMISSION
+            )
+            return 1.0  // Voorkomt crash en geeft een veilige standaardwaarde terug
+        }
+
+        val externalDir = File(Environment.getExternalStorageDirectory(), "Documents/AAPS/")
+        val resistentieFile = File(externalDir, "ANALYSE/resistentie.txt")
+
+        return if (resistentieFile.exists()) {
+            resistentieFile.readText().trim().toDouble().div(100) // Converteer percentage naar factor
+        } else {
+            1.0 // Voorkomt crash als het bestand niet bestaat
+        }
+    }
+
+    val REQUEST_CODE_STORAGE_PERMISSION = 1001
+
+
+
     private fun updateSensitivity() {
         _binding ?: return
         val lastAutosensData = iobCobCalculator.ads.getLastAutosensData("Overview", aapsLogger, dateUtil)
@@ -1215,17 +1253,17 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             else 0.0
 
 
-        val externalDir = File(Environment.getExternalStorageDirectory(), "Documents/AAPS/")
-        val resistentieFile = File(externalDir, "ANALYSE/resistentie.txt")
+    //    val externalDir = File(Environment.getExternalStorageDirectory(), "Documents/AAPS/")
+    //    val resistentieFile = File(externalDir, "ANALYSE/resistentie.txt")
 
-        val ratioFactor: Double = if (resistentieFile.exists()) {
-            resistentieFile.readText().trim().toDouble().div(100)  // Converteer percentage naar factor
-        } else {
-            1.0  // Voorkomt een crash als het bestand niet bestaat
-        }
+    //    val ratioFactor: Double = if (resistentieFile.exists()) {
+    //        resistentieFile.readText().trim().toDouble().div(100)  // Converteer percentage naar factor
+    //    } else {
+    //        1.0  // Voorkomt een crash als het bestand niet bestaat
+    //    }
 
         // val ratioUsed = request?.autosensResult?.ratio ?: 1.0
-        val ratioUsed = ratioFactor
+        val ratioUsed = getRatioFactor(requireContext()) //ratioFactor
 
         if (variableSens != isfMgdl && variableSens != 0.0 && isfMgdl != null) {
             val okDialogText: ArrayList<String> = ArrayList()
@@ -1263,7 +1301,8 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             binding.infoLayout.sensitivity.text =
                 lastAutosensData?.let {
                     //   rh.gs(app.aaps.core.ui.R.string.autosens_short, it.autosensResult.ratio * 100)
-                    rh.gs(app.aaps.core.ui.R.string.autosens_short, ratioFactor * 100)
+                   // rh.gs(app.aaps.core.ui.R.string.autosens_short, ratioFactor * 100)
+                    rh.gs(app.aaps.core.ui.R.string.autosens_short, ratioUsed * 100)
                 } ?: ""
             binding.infoLayout.variableSensitivity.visibility = View.GONE
             binding.infoLayout.sensitivity.visibility = View.VISIBLE
