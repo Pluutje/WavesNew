@@ -202,6 +202,7 @@ dependencies {
     testImplementation(project(":shared:tests"))
     androidTestImplementation(project(":shared:tests"))
     androidTestImplementation(libs.androidx.test.rules)
+    //noinspection DuplicatePlatformClasses
     androidTestImplementation(libs.org.skyscreamer.jsonassert)
 
 
