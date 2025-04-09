@@ -121,4 +121,6 @@ enum class BooleanKey(
     stappenAanUit("stappenAanUit",true),
     PersistentAanUit("PersistentAanUit",true),
     stappenHorloge("stappenHorloge",true),
+
+    uamBoost("uamBoost",true),
 }

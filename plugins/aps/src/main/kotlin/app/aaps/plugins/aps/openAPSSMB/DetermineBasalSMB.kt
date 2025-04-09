@@ -607,13 +607,6 @@ class DetermineBasalSMB @Inject constructor(
 
     fun UAM_Boost(target_bg: Double, iob: Double): UAMBoost_class {
         val now = dateUtil.now()
-
-        // Cooldown van 15 minuten
-        if ((now - lastUAMBoostTime) < T.mins(15).msecs()) {
-            val log = "\n﴿ UAM boost ﴾\n ● Boost cooldown actief → Geen nieuwe boost\n"
-            return UAMBoost_class(100.0, log)
-        }
-
         val startTime = now - T.mins(50).msecs()
         val endTime = now
         val bgReadings = persistenceLayer.getBgReadingsDataFromTimeToTime(startTime, endTime, false)
@@ -629,12 +622,27 @@ class DetermineBasalSMB @Inject constructor(
         val Cf_UAMBoost_Bg = Calc_Cf_Bg(bg_act, 0.9, 1.1, (target_bg / 18 + 1), 7.0)
         val Cf_IOB = Calc_Cf_IOB(iob, 0.6, 1.1, 2.0, 6.0, delta15)
 
-        var uam_boost_percentage = 100.0
-        val drempel_uam = 18.0 // 1.0 mmol/L * 18
-        val display_UAM_Perc: Int
-        var log_UAMBoost = "\n﴿ UAM boost ﴾\n"
+        var uam_boost_percentage = preferences.get(IntKey.uam_boostPerc).toDouble()
+        val drempel_uam = preferences.get(DoubleKey.uam_boostDrempel) * 18.0 // 1.0 mmol/L * 18
+        var display_UAM_Perc: Int
+        var log = "\n﴿ UAM boost ﴾\n"
 
-        if (delta15 >= drempel_uam) {
+     if (delta15 < 0) {
+         uam_boost_percentage = 100.0 + (delta15 * 2.5).coerceIn(-30.0, 0.0)
+         display_UAM_Perc = uam_boost_percentage.toInt()
+         log += " ● ∆15: ${round(delta15 / 18, 2)} (< 0) → perc. $display_UAM_Perc% \n"
+         return UAMBoost_class(uam_boost_percentage, log)
+         }
+
+        // Cooldown
+     val Cooldown = preferences.get(IntKey.uam_boostWachttijd).toLong()
+     val minLastBoost =  ((now - lastUAMBoostTime)/(1000*60)).toInt()
+     if ((now - lastUAMBoostTime) < T.mins(Cooldown).msecs()) {
+         log += " ● Last Boost $minLastBoost min geleden.\n  ● cooldown actief → Geen nieuwe boost\n"
+         return UAMBoost_class(100.0, log)
+        }
+
+     if (delta15 >= drempel_uam) {
             val rest_uam = delta15 - drempel_uam
             val extra = 10 * Math.pow((delta15 - delta15_oud).toDouble(), 1.0 / 3.0)
             uam_boost_percentage += rest_uam.toInt() + extra.toInt()
@@ -644,24 +652,20 @@ class DetermineBasalSMB @Inject constructor(
             display_UAM_Perc = uam_boost_percentage.toInt()
             lastUAMBoostTime = now  // <-- cooldown activeren
 
-            log_UAMBoost += " ● UAM-Boost perc = $display_UAM_Perc%\n"
-            log_UAMBoost += " ● ∆15 = ${round(delta15 / 18, 2)} >= ${round(drempel_uam / 18, 2)}\n"
-            log_UAMBoost += " ● Bg correctie = ${round(Cf_UAMBoost_Bg, 2)}\n"
-            log_UAMBoost += " ● IOB correctie = ${round(Cf_IOB, 2)}\n"
+            log += " ● UAM-Boost perc = $display_UAM_Perc%\n"
+            log += " ● ∆15 = ${round(delta15 / 18, 2)} >= ${round(drempel_uam / 18, 2)}\n"
+            log += " ● Bg correctie = ${round(Cf_UAMBoost_Bg, 2)}\n"
+            log += " ● IOB correctie = ${round(Cf_IOB, 2)}\n"
 
-        } else if (delta15 < 0) {
-            uam_boost_percentage = 100.0 + (delta15 * 2.5).coerceIn(-20.0, 0.0)
-            display_UAM_Perc = uam_boost_percentage.toInt()
-            log_UAMBoost += " ● ∆15 = ${round(delta15 / 18, 2)} < 0\n"
-            log_UAMBoost += " ● UAM-Boost perc = $display_UAM_Perc%\n"
+
 
         } else {
-            display_UAM_Perc = uam_boost_percentage.toInt()
-            log_UAMBoost += " ● ∆15 = ${round(delta15 / 18, 2)} < drempel → Geen boost\n"
-            log_UAMBoost += " ● UAM-Boost perc = $display_UAM_Perc%\n"
+            uam_boost_percentage = 100.0
+            log += " ● ∆15: ${round(delta15 / 18, 2)} (< drempel) → Geen boost\n"
+
         }
 
-        return UAMBoost_class(uam_boost_percentage, log_UAMBoost)
+        return UAMBoost_class(uam_boost_percentage, log)
     }
 
     fun Persistent(): Persistent_class {
@@ -683,7 +687,7 @@ class DetermineBasalSMB @Inject constructor(
         var delta30 = 0f
         if (bgReadings.size >= 7) {
             delta15 = (bgReadings[0].value - bgReadings[3].value)
-            //       delta15_oud = (bgReadings[1].value - bgReadings[4].value)
+            //       delta15_oud = (bgReadings[1].value - bgReadings[4].value)    carb_time
             bg_act = round(bgReadings[0].value/18,2)
             delta5 = (bgReadings[0].value - bgReadings[1].value).toFloat()
             delta30 = (bgReadings[0].value - bgReadings[6].value).toFloat()
@@ -943,11 +947,29 @@ class DetermineBasalSMB @Inject constructor(
             consoleError("---------------------------------------------------------")
         }
 
+        val iobArray = iob_data_array
+        val iob_data = iobArray[0]
+
+        var log_uam = ""
+
+        if (preferences.get(BooleanKey.uamBoost)) {
+            if (!Nacht()) {
+                var (uam_perc, log_uam) = UAM_Boost(target_bg, iob_data.iob)
+                consoleLog(log_uam)
+            } else {
+                log_uam = "\n﴿ UAM boost ﴾\n ● Nacht Boost niet actief\n"
+            }
+        } else {
+            log_uam = "\n﴿ UAM boost ﴾\n ● Boost uitgeschakeld\n"
+        }
+
+
         val (resistentie_factor,log_res) = Resistentie()
         val (persistent_factor,log_persistent) = Persistent()
         val (stap_perc,stap_target,log_stappen) = Stappen()
 
         consoleLog(log_res)
+        consoleLog(log_uam)
         consoleLog(log_persistent)
         consoleLog(log_stappen)
         consoleLog(log_ExtraIns)
@@ -1009,18 +1031,7 @@ class DetermineBasalSMB @Inject constructor(
 
 
 
-        val iobArray = iob_data_array
-        val iob_data = iobArray[0]
 
-        var log_uam = ""
-        if (!Nacht()) {
-            var (uam_perc, log_uam) = UAM_Boost(target_bg, iob_data.iob)
-            consoleLog(log_uam)
-        } else {
-            log_uam = "\n﴿ UAM boost ﴾\n ● Nacht Boost niet actief\n"
-        }
-
-        consoleLog(log_uam)
 
         val tick: String
 

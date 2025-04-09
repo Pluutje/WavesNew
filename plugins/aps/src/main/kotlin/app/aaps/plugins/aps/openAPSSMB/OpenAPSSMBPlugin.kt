@@ -660,8 +660,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
             })
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
-                key = "Persistent instelling"
-                title = "Persistent instelling"
+                key = "Bg / Persistent instelling"
+                title = "Bg / Persistent instelling"
                 addPreference(
                     AdaptiveIntentPreference(
                         ctx = context,
@@ -670,6 +670,10 @@ open class OpenAPSSMBPlugin @Inject constructor(
                         summary = R.string.Info_Persistent
                     )
                 )
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.uamBoost, summary = R.string.uamBoost_summary, title = R.string.uamBoost_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.uam_boostPerc, dialogMessage = R.string.uam_boostPerc_summary, title = R.string.uam_boostPerc_title))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.uam_boostDrempel, dialogMessage = R.string.uam_boostDrempel_summary, title = R.string.uam_boostDrempel_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.uam_boostWachttijd, dialogMessage = R.string.uam_boostWachttijd_summary, title = R.string.uam_boostWachttijd_title))
 
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.PersistentAanUit, summary = R.string.PersistentAanUit_summary, title = R.string.PersistentAanUit_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.persistent_Dagdrempel, dialogMessage = R.string.persistent_Dagdrempel_summary, title = R.string.persistent_Dagdrempel_title))

@@ -357,4 +357,13 @@
     <string name="wave_End_summary">Time until which wave mode is enabled.</string>
     <string name="wave_End_title">Wave end time [hh:mm]</string>
 
+    <string name="uamBoost_summary">Bij activering wordt boven de drempel waarde de insuline afgifte naar boven gecorrigeerd</string>
+    <string name="uamBoost_title">UAM Boost</string>
+    <string name="uam_boostPerc_summary">Het start percentage wat nog wordt gecorrigeerd voor delta, IOB en Bg</string>
+    <string name="uam_boostPerc_title">Boost basis percentage (%)</string>
+    <string name="uam_boostDrempel_summary">Drempel bg-waarde waarboven de extra correctie snachts wordt toegepast</string>
+    <string name="uam_boostDrempel_title"> ∆15 drempel (mmol/l)</string>
+    <string name="uam_boostWachttijd_summary">minimum wachttijd na een boost voordat een nieuwe wordt geactiveerd</string>
+    <string name="uam_boostWachttijd_title">min. Tijd tussen 2 boosts (min)</string>
+
 </resources>

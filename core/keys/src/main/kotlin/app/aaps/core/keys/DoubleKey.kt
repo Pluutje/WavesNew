@@ -62,4 +62,6 @@ enum class DoubleKey(
     persistent_Dagdrempel("persistent_Dagdrempel", 8.5,7.0,12.0),
     persistent_Nachtdrempel("persistent_Nachtdrempel",7.0,6.0,10.0),
     persistent_grens("persistent_grens",0.5,0.1, 1.0),
+
+    uam_boostDrempel("uam_boostDrempel", 0.9,0.8,1.2),
 }

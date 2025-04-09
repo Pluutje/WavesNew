@@ -96,9 +96,14 @@ class SafetyPlugin @Inject constructor(
         return value
     }
 
+    //override fun isAdvancedFilteringEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
+    //    val bgSource = activePlugin.activeBgSource
+    //    if (!bgSource.advancedFilteringSupported()) value.set(false, rh.gs(R.string.smbalwaysdisabled), this)
+    //    return value
+    //}
     override fun isAdvancedFilteringEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
         val bgSource = activePlugin.activeBgSource
-        if (!bgSource.advancedFilteringSupported()) value.set(false, rh.gs(R.string.smbalwaysdisabled), this)
+        if (!bgSource.advancedFilteringSupported()) value.set(true, " SMB always enabled", this)
         return value
     }
 
