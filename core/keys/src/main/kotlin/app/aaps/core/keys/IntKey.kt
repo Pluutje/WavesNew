@@ -87,7 +87,8 @@ enum class IntKey(
     Dag_MaxPersistentPerc("Dag_MaxPersistentPerc", 120,100,200),
     Nacht_MaxPersistentPerc("Nacht_MaxPersistentPerc", 120,100,200),
 
-    uam_boostPerc("uam_boostPerc", 150,100,300),
+    uam_boostPerc("uam_boostPerc", 100,100,250),
+    max_uam_boostPerc("max_uam_boostPerc", 150,120,300),
     uam_boostWachttijd("uam_boostWachttijd", 15,5,120),
 
 

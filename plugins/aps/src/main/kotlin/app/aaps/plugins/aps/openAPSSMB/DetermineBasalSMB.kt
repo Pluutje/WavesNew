@@ -74,6 +74,7 @@ class DetermineBasalSMB @Inject constructor(
     private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
     private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
     private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
+    private val csvfile = File(externalDir, "ANALYSE/analyse.csv")
     private val consoleError = mutableListOf<String>()
     private val consoleLog = mutableListOf<String>()
     private var bolus_via_basaal = false
@@ -596,7 +597,7 @@ class DetermineBasalSMB @Inject constructor(
         val halfSlope = slope / 2
         val adjustedIOB = (IOB + halfSlope) / (offset + halfSlope)
         val cf_iob = min_Cf + (max_Cf - min_Cf) / (1 + Math.pow(adjustedIOB, slope))
-        val cf_delta = (1 + (2 * delta15) / 100).coerceIn(0.5,1.0)
+        val cf_delta = (1 + (2 * delta15) / 75).coerceIn(0.5,1.0)
         return cf_iob * cf_delta
     }
     fun Calc_Cf_Bg(Bg: Double, min_Cf: Double, max_Cf: Double, offset: Double, slope: Double): Double {
@@ -620,17 +621,22 @@ class DetermineBasalSMB @Inject constructor(
         val bg_act = round(bgReadings[0].value / 18, 2)
 
         val Cf_UAMBoost_Bg = Calc_Cf_Bg(bg_act, 0.9, 1.1, (target_bg / 18 + 1), 7.0)
-        val Cf_IOB = Calc_Cf_IOB(iob, 0.6, 1.1, 2.0, 6.0, delta15)
+        val Cf_IOB = Calc_Cf_IOB(iob, 0.6, 1.2, 2.0, 6.0, delta15)
 
         var uam_boost_percentage = preferences.get(IntKey.uam_boostPerc).toDouble()
+        var max_uam_boost_percentage = preferences.get(IntKey.max_uam_boostPerc).toDouble()
         val drempel_uam = preferences.get(DoubleKey.uam_boostDrempel) * 18.0 // 1.0 mmol/L * 18
         var display_UAM_Perc: Int
         var log = "\n﴿ UAM boost ﴾\n"
+        var opm = ""
 
      if (delta15 < 0) {
          uam_boost_percentage = 100.0 + (delta15 * 2.5).coerceIn(-30.0, 0.0)
          display_UAM_Perc = uam_boost_percentage.toInt()
          log += " ● ∆15: ${round(delta15 / 18, 2)} (< 0) → perc. $display_UAM_Perc% \n"
+         opm = "d15 < 0"
+         log_uam(bg_act, iob, delta15, delta15_oud, display_UAM_Perc, opm)
+
          return UAMBoost_class(uam_boost_percentage, log)
          }
 
@@ -639,6 +645,8 @@ class DetermineBasalSMB @Inject constructor(
      val minLastBoost =  ((now - lastUAMBoostTime)/(1000*60)).toInt()
      if ((now - lastUAMBoostTime) < T.mins(Cooldown).msecs()) {
          log += " ● Last Boost $minLastBoost min geleden.\n  ● cooldown actief → Geen nieuwe boost\n"
+         opm = "cooldown actief"
+         log_uam(bg_act, iob, delta15, delta15_oud, 100, opm)
          return UAMBoost_class(100.0, log)
         }
 
@@ -648,10 +656,10 @@ class DetermineBasalSMB @Inject constructor(
             uam_boost_percentage += rest_uam.toInt() + extra.toInt()
             uam_boost_percentage *= Cf_UAMBoost_Bg
             uam_boost_percentage *= Cf_IOB
-
+            uam_boost_percentage = (uam_boost_percentage).coerceIn(100.0, max_uam_boost_percentage)
             display_UAM_Perc = uam_boost_percentage.toInt()
-            lastUAMBoostTime = now  // <-- cooldown activeren
-
+            if (uam_boost_percentage > 125) {lastUAMBoostTime = now}  // <-- cooldown activeren
+            opm = "d15 > drempel"
             log += " ● UAM-Boost perc = $display_UAM_Perc%\n"
             log += " ● ∆15 = ${round(delta15 / 18, 2)} >= ${round(drempel_uam / 18, 2)}\n"
             log += " ● Bg correctie = ${round(Cf_UAMBoost_Bg, 2)}\n"
@@ -661,10 +669,12 @@ class DetermineBasalSMB @Inject constructor(
 
         } else {
             uam_boost_percentage = 100.0
+            display_UAM_Perc = uam_boost_percentage.toInt()
+            opm = "0 < d15 < drempel"
             log += " ● ∆15: ${round(delta15 / 18, 2)} (< drempel) → Geen boost\n"
 
         }
-
+        log_uam(bg_act, iob, delta15, delta15_oud, display_UAM_Perc, opm)
         return UAMBoost_class(uam_boost_percentage, log)
     }
 
@@ -845,6 +855,27 @@ class DetermineBasalSMB @Inject constructor(
 
     }
 
+    fun log_uam(Bg:Double, IOB:Double, D15:Double, D15_oud:Double, perc:Int, Opm:String) {
+
+        val dateStr = dateUtil.dateAndTimeString(dateUtil.now()).toString()
+        val BgStr = round(Bg,1).toString()
+        val iobStr = round(IOB,2).toString()
+        val delta15Str = round(D15/18,1).toString()
+        val delta15oudStr = round(D15_oud/18,1).toString()
+        val UAMPercStr = perc.toString()
+
+        val headerRow = "datum, bg, iob, delta15, delta15oud, Bgperc, opm.\n"
+        val valuesToRecord = "$dateStr, $BgStr, $iobStr, $delta15Str, $delta15oudStr, $UAMPercStr, $Opm"
+
+        if (!csvfile.exists()) {
+            csvfile.createNewFile()
+            csvfile.appendText(headerRow)
+        }
+        csvfile.appendText(valuesToRecord + "\n")
+
+    }
+
+
     fun determine_basal(
         glucose_status: GlucoseStatus, currenttemp: CurrentTemp, iob_data_array: Array<IobTotal>, profile: OapsProfile, autosens_data: AutosensResult, meal_data: MealData,
         microBolusAllowed: Boolean, currentTime: Long, flatBGsDetected: Boolean, dynIsfMode: Boolean
@@ -951,13 +982,14 @@ class DetermineBasalSMB @Inject constructor(
         val iob_data = iobArray[0]
 
         var log_uam = ""
-
+        var UAM_boost_perc = 100.0
         if (preferences.get(BooleanKey.uamBoost)) {
             if (!Nacht()) {
                 var (uam_perc, log_uam) = UAM_Boost(target_bg, iob_data.iob)
+                UAM_boost_perc = uam_perc
                 consoleLog(log_uam)
             } else {
-                log_uam = "\n﴿ UAM boost ﴾\n ● Nacht Boost niet actief\n"
+                log_uam = "\n﴿ UAM boost ﴾\n ● Nacht: Boost niet actief\n"
             }
         } else {
             log_uam = "\n﴿ UAM boost ﴾\n ● Boost uitgeschakeld\n"
@@ -1068,6 +1100,9 @@ class DetermineBasalSMB @Inject constructor(
         }
         if (preferences.get(BooleanKey.PersistentAanUit)) {
             sens = sens / (persistent_factor)
+        }
+        if (preferences.get(BooleanKey.uamBoost)) {
+            sens = sens / (UAM_boost_perc/100)
         }
 
         // consoleError("CR:${profile.carb_ratio}")

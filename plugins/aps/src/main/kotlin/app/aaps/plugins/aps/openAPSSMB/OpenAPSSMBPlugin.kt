@@ -672,6 +672,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 )
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.uamBoost, summary = R.string.uamBoost_summary, title = R.string.uamBoost_title))
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.uam_boostPerc, dialogMessage = R.string.uam_boostPerc_summary, title = R.string.uam_boostPerc_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.max_uam_boostPerc, dialogMessage = R.string.max_uam_boostPerc_summary, title = R.string.max_uam_boostPerc_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.uam_boostDrempel, dialogMessage = R.string.uam_boostDrempel_summary, title = R.string.uam_boostDrempel_title))
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.uam_boostWachttijd, dialogMessage = R.string.uam_boostWachttijd_summary, title = R.string.uam_boostWachttijd_title))
 
