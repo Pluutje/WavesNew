@@ -259,6 +259,11 @@ class InsulinDialog : DialogFragmentWithDate() {
         //  val file = File(path, "Documents/AAPS/ANALYSE/Act-extra-ins.txt")
         //  val filebasaal = File(path, "Documents/AAPS/ANALYSE/Bolus-via-basaal.txt")
 
+        // Zorg dat de map bestaat
+        if (!ActExtraIns.parentFile.exists()) {
+            ActExtraIns.parentFile.mkdirs()
+        }
+
         if (extraInsulineChecked){
             ActExtraIns.writeText("checked" + "\n" + tijdNu + "\n" + tijdExtraInsuline + "\n" + percentageExtraInsuline)
         } else {
@@ -273,6 +278,11 @@ class InsulinDialog : DialogFragmentWithDate() {
             insulin = 0.0
             insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(insulin, aapsLogger)).value()
         }
+
+        if (!BolusViaBasaal.parentFile.exists()) {
+            BolusViaBasaal.parentFile.mkdirs()
+        }
+
 
         if (bolusviabasaalChecked && insulin > 0.0) {
             insulin = 0.0

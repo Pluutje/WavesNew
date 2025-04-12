@@ -74,7 +74,7 @@ class DetermineBasalSMB @Inject constructor(
     private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
     private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
     private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
-    private val csvfile = File(externalDir, "ANALYSE/analyse.csv")
+   // private val csvfile = File(externalDir, "ANALYSE/analyse.csv")
     private val consoleError = mutableListOf<String>()
     private val consoleLog = mutableListOf<String>()
     private var bolus_via_basaal = false
@@ -635,7 +635,7 @@ class DetermineBasalSMB @Inject constructor(
          display_UAM_Perc = uam_boost_percentage.toInt()
          log += " ● ∆15: ${round(delta15 / 18, 2)} (< 0) → perc. $display_UAM_Perc% \n"
          opm = "d15 < 0"
-         log_uam(bg_act, iob, delta15, delta15_oud, display_UAM_Perc, opm)
+         log_uam( bg_act, iob, delta15, delta15_oud, display_UAM_Perc, opm)
 
          return UAMBoost_class(uam_boost_percentage, log)
          }
@@ -646,7 +646,7 @@ class DetermineBasalSMB @Inject constructor(
      if ((now - lastUAMBoostTime) < T.mins(Cooldown).msecs()) {
          log += " ● Last Boost $minLastBoost min geleden.\n  ● cooldown actief → Geen nieuwe boost\n"
          opm = "cooldown actief"
-         log_uam(bg_act, iob, delta15, delta15_oud, 100, opm)
+         log_uam( bg_act, iob, delta15, delta15_oud, 100, opm)
          return UAMBoost_class(100.0, log)
         }
 
@@ -854,7 +854,7 @@ class DetermineBasalSMB @Inject constructor(
         return Bolus_Basaal(bolus_via_basaal,temp_basaal,rest_tijd.toFloat())
 
     }
-
+/*
     fun log_uam(Bg:Double, IOB:Double, D15:Double, D15_oud:Double, perc:Int, Opm:String) {
 
         val dateStr = dateUtil.dateAndTimeString(dateUtil.now()).toString()
@@ -873,7 +873,55 @@ class DetermineBasalSMB @Inject constructor(
         }
         csvfile.appendText(valuesToRecord + "\n")
 
+    }  */
+
+    fun getCurrentWeekId(): String {
+        val now = java.util.Calendar.getInstance()
+        val week = now.get(java.util.Calendar.WEEK_OF_YEAR)
+        val year = now.get(java.util.Calendar.YEAR)
+        return String.format("%d-W%02d", year, week)
     }
+
+    fun log_uam(Bg: Double, IOB: Double, D15: Double, D15_oud: Double, perc: Int, Opm: String) {
+        val dateStr = dateUtil.dateAndTimeString(dateUtil.now()).toString()
+        val BgStr = round(Bg, 1).toString()
+        val iobStr = round(IOB, 2).toString()
+        val delta15Str = round(D15 / 18, 1).toString()
+        val delta15oudStr = round(D15_oud / 18, 1).toString()
+        val UAMPercStr = perc.toString()
+
+        val headerRow = "datum, bg, iob, delta15, delta15oud, Bgperc, opm.\n"
+        val valuesToRecord = "$dateStr, $BgStr, $iobStr, $delta15Str, $delta15oudStr, $UAMPercStr, $Opm"
+
+        // Bepaal pad op basis van weeknummer
+        val weekId = getCurrentWeekId()
+        val weeklyLogFile = File(externalDir, "ANALYSE/weekly/uam_log_$weekId.csv")
+
+        // Zorg dat de map bestaat
+        if (!weeklyLogFile.parentFile.exists()) {
+            weeklyLogFile.parentFile.mkdirs()
+        }
+
+        // Bestand aanmaken met header als het nog niet bestaat
+        if (!weeklyLogFile.exists()) {
+            weeklyLogFile.createNewFile()
+            weeklyLogFile.appendText(headerRow)
+        }
+
+        // Lees bestaande regels
+        val existingLines = weeklyLogFile.readLines()
+        val updatedContent = buildString {
+            appendLine(headerRow.trim())
+            appendLine(valuesToRecord)
+            for (i in 1 until existingLines.size) {
+                appendLine(existingLines[i])
+            }
+        }
+
+        // Overschrijf bestand
+        weeklyLogFile.writeText(updatedContent)
+    }
+
 
 
     fun determine_basal(
