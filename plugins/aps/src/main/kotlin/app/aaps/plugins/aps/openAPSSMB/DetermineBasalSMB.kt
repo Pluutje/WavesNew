@@ -54,7 +54,7 @@ data class Resistentie_class(val resistentie: Double, val log: String)
 data class Stappen_class(val StapPercentage: Float,val StapTarget: Float, val log: String)
 data class Persistent_class(val PercistentPercentage: Double, val log: String)
 data class UAMBoost_class(val UAMBoostPercentage: Double, val log: String)
-data class Bolus_Basaal(val BolusViaBasaal: Boolean, val BasaalStand: Float ,val ExtraSMB: Float, val ResterendeTijd: Float)
+data class Bolus_SMB(val BolusViaSMB: Boolean, val ExtraSMB: Float, val ResterendAantalSMB: Float)
 data class Extra_Insuline(val ExtraIns_AanUit: Boolean, val ExtraIns_waarde: Double ,val log: String)
 
 class DetermineBasalSMB @Inject constructor(
@@ -79,6 +79,7 @@ class DetermineBasalSMB @Inject constructor(
     private val consoleLog = mutableListOf<String>()
     private var bolus_via_basaal = false
     private var lastUAMBoostTime: Long = 0L
+    private var laatst_verstrekte_SMBfractie = -1
 
     private fun consoleLog(msg: String) {
         consoleLog.add(msg)
@@ -810,63 +811,85 @@ class DetermineBasalSMB @Inject constructor(
 
         return Extra_Insuline(extra_insuline,cf,log_ExtraIns)
     }
+    fun BolusViaSMB(): Bolus_SMB {
 
-    fun BolusViaBasaal(profile: OapsProfile): Bolus_Basaal {
-
-        val pomp = activePlugin.activePump.pumpDescription.tempBasalStyle  //1 bij procent en 2 bij absoluut
-
-        val tijdNu = System.currentTimeMillis()/(60 * 1000)
+        val tijdNu = System.currentTimeMillis() / (60 * 1000)
         var bolus_basaal_check = "0"
         var bolus_basaal_tijdstip = "0"
-        var bolus_basaal_tijd = "0"
+        var aantal_fracties = "0"
         var insuline = "0"
-
-
-        var temp_basaal: Float
-        var Extra_smb: Float
 
         try {
             val sc = Scanner(BolusViaBasaal)
             var teller = 1
             while (sc.hasNextLine()) {
                 val line = sc.nextLine()
-                if (teller == 1) { bolus_basaal_check = line}
-                if (teller == 2) { bolus_basaal_tijdstip = line}
-                if (teller == 3) { bolus_basaal_tijd = line}
-                if (teller == 4) { insuline = line}
-
+                if (teller == 1) bolus_basaal_check = line
+                if (teller == 2) bolus_basaal_tijdstip = line
+                if (teller == 3) aantal_fracties = line
+                if (teller == 4) insuline = line
                 teller += 1
             }
         } catch (e: IOException) {
             e.printStackTrace()
         }
-        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
-        val rest_tijd = bolus_basaal_tijd.toInt() - verstreken_tijd_bolus
-        if (verstreken_tijd_bolus <= ((bolus_basaal_tijd.toInt())+1) && bolus_basaal_check == "checked") {
-            bolus_via_basaal = true
-            if (pomp == 2) {
-             temp_basaal = insuline.toFloat() * 60 / bolus_basaal_tijd.toFloat()
-             Extra_smb = 0.0f
-             } else {
 
-             temp_basaal = (profile.current_basal * 5).toFloat()
-             val ins_via_basaal = temp_basaal * bolus_basaal_tijd.toInt() / 60
-             val rest_insuline = insuline.toFloat() - ins_via_basaal
-             val aantal_smb = (bolus_basaal_tijd.toInt() /5).toInt()
-             Extra_smb = rest_insuline / aantal_smb
-             }
+        val fractie_duur = 5
+        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
+        val verstreken_fracties = verstreken_tijd_bolus / fractie_duur
+        val totaal_fracties = aantal_fracties.toInt()
+        val rest_fracties = totaal_fracties - verstreken_fracties
+
+        return if (
+            verstreken_fracties < totaal_fracties &&
+            bolus_basaal_check == "checked" &&
+            verstreken_fracties > laatst_verstrekte_SMBfractie
+        ) {
+            laatst_verstrekte_SMBfractie = verstreken_fracties
+            val Extra_smb = insuline.toFloat() / totaal_fracties
+            Bolus_SMB(true, Extra_smb, rest_fracties.toFloat())
         } else {
-            bolus_via_basaal = false
-            temp_basaal = 0.0f
-            Extra_smb = 0.0f
+            Bolus_SMB(false, 0.0f, 0.0f)
+        }
+    }
+  /*  fun BolusViaSMB(): Bolus_SMB {
+
+        val tijdNu = System.currentTimeMillis() / (60 * 1000)
+        var bolus_basaal_check = "0"
+        var bolus_basaal_tijdstip = "0"
+        var aantal_fracties = "0"
+        var insuline = "0"
+
+        try {
+            val sc = Scanner(BolusViaBasaal)
+            var teller = 1
+            while (sc.hasNextLine()) {
+                val line = sc.nextLine()
+                if (teller == 1) bolus_basaal_check = line
+                if (teller == 2) bolus_basaal_tijdstip = line
+                if (teller == 3) aantal_fracties = line // hier staat nu aantal fracties
+                if (teller == 4) insuline = line
+                teller += 1
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
         }
 
+        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
+        val fractie_duur = 5 // minuten per fractie
+        val verstreken_fracties = verstreken_tijd_bolus / fractie_duur
+        val totaal_fracties = aantal_fracties.toInt()
+        val rest_fracties = totaal_fracties - verstreken_fracties
 
+        return if (verstreken_fracties < totaal_fracties && bolus_basaal_check == "checked") {
+            val Extra_smb = insuline.toFloat() / totaal_fracties
 
-        return Bolus_Basaal(bolus_via_basaal,temp_basaal,Extra_smb,rest_tijd.toFloat())
+            Bolus_SMB(true, Extra_smb, rest_fracties.toFloat())
+        } else {
 
-    }
-
+            Bolus_SMB(false, 0.0f, 0.0f)
+        }
+    }  */
 
     fun getCurrentWeekId(): String {
         val now = java.util.Calendar.getInstance()
@@ -931,25 +954,21 @@ class DetermineBasalSMB @Inject constructor(
             consoleError = consoleError
         )
 
-        val (bolus_basaal_AanUit,bolus_basaal_waarde,ExtraSMB, rest_tijd_basaal) = BolusViaBasaal(profile)
+        val (bolus_SMB_AanUit,ExtraSMB, rest_aantalSMB) = BolusViaSMB()
         val (extraIns_AanUit,extraIns_Factor,log_ExtraIns) = ActExtraIns()
 
 
 
         // TODO eliminate
         val deliverAt = currentTime
-        if (bolus_basaal_AanUit) {
-            var new_basaal = round_basal(bolus_basaal_waarde.toDouble())
-            // consoleError.add(" ﴿―― Bolus via basaal ――﴾")
-            // consoleError.add(" → basaal: " + round(new_basaal,2) + "(u/h)")
-            // consoleError.add(" → nog $rest_tijd_basaal minuten resterend")
-            // consoleError.add(" ﴿―――――――――――――――﴾")
 
-            rT.reason.append("=> Insuline via basaal:  $bolus_basaal_waarde u/h nog $rest_tijd_basaal minuten resterend")
-            rT.reason.append("=> Extra SMB:  $ExtraSMB eh")
+        if (bolus_SMB_AanUit) {
+
+            rT.reason.append("=> Insuline via SMB:  $ExtraSMB eh per keer. nog $rest_aantalSMB keer resterend")
+
             rT.deliverAt = deliverAt
             rT.duration = 30
-            rT.rate = new_basaal
+            rT.rate = 0.0
             rT.units = ExtraSMB.toDouble()
             return rT
         }

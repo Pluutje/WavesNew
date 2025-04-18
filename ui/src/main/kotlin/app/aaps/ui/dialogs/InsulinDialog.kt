@@ -164,9 +164,9 @@ class InsulinDialog : DialogFragmentWithDate() {
             savedInstanceState?.getDouble("percentage")
                 ?:225.0, 50.0, 500.0, 25.0, DecimalFormat("0"), true, binding.okcancel.ok, textWatcher
         )
-        binding.tijdbasaal.setParams(
-            savedInstanceState?.getDouble("tijdbasaal")
-                ?: 25.0, 5.0, 60.0, 5.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
+        binding.aantalsmb.setParams(
+            savedInstanceState?.getDouble("aantal")
+                ?: 5.0, 1.0, 12.0, 1.0, DecimalFormat("0"), false, binding.okcancel.ok, textWatcher
         )
 
        // binding.editTextInput.text
@@ -210,7 +210,7 @@ class InsulinDialog : DialogFragmentWithDate() {
         binding.tijdLayout.visibility = View.VISIBLE //View.GONE
         binding.percentageLayout.visibility = View.VISIBLE //View.GONE
 
-        binding.tijdbasaalLayout.visibility = View.VISIBLE
+        binding.aantalsmbLayout.visibility = View.VISIBLE
         binding.uitgesteldbasaalLayout.visibility = View.VISIBLE
 
         binding.insulinLabel.labelFor = binding.amount.editTextId
@@ -250,7 +250,7 @@ class InsulinDialog : DialogFragmentWithDate() {
         val bolusviabasaalChecked = binding.bolusViaBasaal.isChecked
         val alleenBoostChecked = binding.geenBolus.isChecked
         val StopBolusChecked = binding.stopBolus.isChecked
-        val tijdbolusbasaal = (binding.tijdbasaal.value.toInt()).toString()
+        val aantalSMB = (binding.aantalsmb.value.toInt()).toString()
         val tijdExtraInsuline = (binding.tijd.value.toInt()).toString()
         val percentageExtraInsuline = (binding.percentage.value.toInt()).toString()
         val tijdNu =  (System.currentTimeMillis() / (60 * 1000)).toString()
@@ -288,15 +288,15 @@ class InsulinDialog : DialogFragmentWithDate() {
             insulin = 0.0
             insulinAfterConstraints = 0.0
 
-            BolusViaBasaal.writeText("checked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+            BolusViaBasaal.writeText("checked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
             val opmerking = binding.editTextInput.text.toString()
             schrijfBolusOverzicht(insuline, opmerking)
         } else {
-            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
         }
 
         if (StopBolusChecked) {
-            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + tijdbolusbasaal + "\n" + insuline)
+            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
         }
 // Einde eigen input
 
@@ -393,7 +393,7 @@ class InsulinDialog : DialogFragmentWithDate() {
 
             if (bolusviabasaalChecked && !alleenBoostChecked && !StopBolusChecked) {
                 activity?.let { activity ->
-                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Bolus wordt gegeven via basaal ")
+                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Bolus wordt gegeven via $aantalSMB smb's ")
                 }
             } else {
                 if (alleenBoostChecked || StopBolusChecked) {

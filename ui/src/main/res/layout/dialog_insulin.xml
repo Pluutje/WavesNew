@@ -57,29 +57,29 @@
                 android:layout_height="match_parent"
                 android:checked="true"
                 android:layout_marginTop="5dp"
-                android:text="Geef bolus insuline af via basaal" />
+                android:text="Geef insuline af via smb's" />
 
             <LinearLayout
-                android:id="@+id/tijdbasaal_layout"
+                android:id="@+id/aantalsmb_layout"
                 android:layout_width="390dp"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tijdbasaal_label"
+                    android:id="@+id/aantalsmb_label"
                     android:layout_width="160dp"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
                     android:width="120dp"
                     android:padding="10dp"
-                    android:text="Tijd verhoogd basaal"
+                    android:text="aantal smb's"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
                     android:textStyle="bold" />
 
 
 
                 <app.aaps.core.ui.elements.MinutesNumberPicker
-                    android:id="@+id/tijdbasaal"
+                    android:id="@+id/aantalsmb"
                     android:layout_width="130dp"
                     android:layout_height="40dp"
                     android:layout_marginBottom="2dp"
@@ -94,7 +94,7 @@
                     android:minWidth="45dp"
                     android:paddingStart="5dp"
                     android:paddingEnd="5dp"
-                    android:text="@string/unit_minute_short"
+                    android:text="keer"
                     android:textAppearance="?android:attr/textAppearanceSmall" />
 
             </LinearLayout>
@@ -122,7 +122,7 @@
                 android:layout_height="match_parent"
                 android:checked="false"
                 android:layout_marginTop="5dp"
-                android:text="Activeer extra insuline percentage" />
+                android:text="Activeer extra boost percentage" />
 
             <LinearLayout
                 android:id="@+id/tijd_layout"
@@ -137,7 +137,7 @@
                     android:layout_gravity="center_horizontal"
                     android:width="120dp"
                     android:padding="10dp"
-                    android:text="Looptijd insuline %"
+                    android:text="Looptijd boost %"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
                     android:textStyle="bold" />
 
@@ -176,7 +176,7 @@
                     android:width="120dp"
                     android:paddingStart="10dp"
                     android:paddingEnd="10dp"
-                    android:text="Insuline percentage"
+                    android:text="Boost percentage"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
                     android:textStyle="bold" />
 
