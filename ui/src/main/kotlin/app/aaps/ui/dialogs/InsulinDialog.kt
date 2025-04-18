@@ -393,7 +393,7 @@ class InsulinDialog : DialogFragmentWithDate() {
 
             if (bolusviabasaalChecked && !alleenBoostChecked && !StopBolusChecked) {
                 activity?.let { activity ->
-                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " Bolus wordt gegeven via $aantalSMB smb's ")
+                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " $insuline eh bolus wordt gegeven via $aantalSMB smb's ")
                 }
             } else {
                 if (alleenBoostChecked || StopBolusChecked) {
