@@ -54,7 +54,7 @@ data class Resistentie_class(val resistentie: Double, val log: String)
 data class Stappen_class(val StapPercentage: Float,val StapTarget: Float, val log: String)
 data class Persistent_class(val PercistentPercentage: Double, val log: String)
 data class UAMBoost_class(val UAMBoostPercentage: Double, val log: String)
-data class Bolus_SMB(val BolusViaSMB: Boolean, val ExtraSMB: Float, val ResterendAantalSMB: Float)
+data class Bolus_SMB(val BolusViaSMB: Boolean, val ExtraSMB: Float, val ResterendAantalSMB: Int)
 data class Extra_Insuline(val ExtraIns_AanUit: Boolean, val ExtraIns_waarde: Double ,val log: String)
 
 class DetermineBasalSMB @Inject constructor(
@@ -80,6 +80,7 @@ class DetermineBasalSMB @Inject constructor(
     private var bolus_via_basaal = false
     private var lastUAMBoostTime: Long = 0L
     private var laatst_verstrekte_SMBfractie = -1
+    private var vorige_bolus_tijdstip = -1
 
     private fun consoleLog(msg: String) {
         consoleLog.add(msg)
@@ -811,6 +812,7 @@ class DetermineBasalSMB @Inject constructor(
 
         return Extra_Insuline(extra_insuline,cf,log_ExtraIns)
     }
+
     fun BolusViaSMB(): Bolus_SMB {
 
         val tijdNu = System.currentTimeMillis() / (60 * 1000)
@@ -833,6 +835,10 @@ class DetermineBasalSMB @Inject constructor(
         } catch (e: IOException) {
             e.printStackTrace()
         }
+        if (bolus_basaal_tijdstip.toInt() != vorige_bolus_tijdstip) {
+            laatst_verstrekte_SMBfractie = -1
+            vorige_bolus_tijdstip = bolus_basaal_tijdstip.toInt()
+        }
 
         val fractie_duur = 5
         val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
@@ -847,49 +853,61 @@ class DetermineBasalSMB @Inject constructor(
         ) {
             laatst_verstrekte_SMBfractie = verstreken_fracties
             val Extra_smb = insuline.toFloat() / totaal_fracties
-            Bolus_SMB(true, Extra_smb, rest_fracties.toFloat())
+            val adjusted_rest_fracties = rest_fracties - 1
+            Bolus_SMB(true, Extra_smb, adjusted_rest_fracties)
         } else {
-            Bolus_SMB(false, 0.0f, 0.0f)
+            Bolus_SMB(false, 0.0f, 0)
         }
-    }
-  /*  fun BolusViaSMB(): Bolus_SMB {
 
-        val tijdNu = System.currentTimeMillis() / (60 * 1000)
-        var bolus_basaal_check = "0"
-        var bolus_basaal_tijdstip = "0"
-        var aantal_fracties = "0"
+
+    }
+   /* fun BolusViaSMB(): Bolus_SMB {
+        val tijdNuMinuten = System.currentTimeMillis() / (60 * 1000)
+
+        var check = "0"
+        var tijdstip = "0"
+        var fracties = "0"
         var insuline = "0"
 
         try {
-            val sc = Scanner(BolusViaBasaal)
-            var teller = 1
-            while (sc.hasNextLine()) {
-                val line = sc.nextLine()
-                if (teller == 1) bolus_basaal_check = line
-                if (teller == 2) bolus_basaal_tijdstip = line
-                if (teller == 3) aantal_fracties = line // hier staat nu aantal fracties
-                if (teller == 4) insuline = line
-                teller += 1
+            Scanner(BolusViaBasaal).use { sc ->
+                if (sc.hasNextLine()) check = sc.nextLine()
+                if (sc.hasNextLine()) tijdstip = sc.nextLine()
+                if (sc.hasNextLine()) fracties = sc.nextLine()
+                if (sc.hasNextLine()) insuline = sc.nextLine()
             }
         } catch (e: IOException) {
             e.printStackTrace()
+            return Bolus_SMB(false, 0.0f, 0)
         }
 
-        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
-        val fractie_duur = 5 // minuten per fractie
-        val verstreken_fracties = verstreken_tijd_bolus / fractie_duur
-        val totaal_fracties = aantal_fracties.toInt()
-        val rest_fracties = totaal_fracties - verstreken_fracties
+        val tijdstipInt = tijdstip.toIntOrNull() ?: return Bolus_SMB(false, 0.0f, 0)
+        val fractiesInt = fracties.toIntOrNull()?.coerceAtLeast(1) ?: return Bolus_SMB(false, 0.0f, 0)
+        val insulineFloat = insuline.toFloatOrNull() ?: return Bolus_SMB(false, 0.0f, 0)
 
-        return if (verstreken_fracties < totaal_fracties && bolus_basaal_check == "checked") {
-            val Extra_smb = insuline.toFloat() / totaal_fracties
+        if (tijdstipInt != vorige_bolus_tijdstip) {
+            laatst_verstrekte_SMBfractie = -1
+            vorige_bolus_tijdstip = tijdstipInt
+        }
 
-            Bolus_SMB(true, Extra_smb, rest_fracties.toFloat())
+        val verstrekenTijd = (tijdNuMinuten - tijdstipInt).toInt()
+        val verstrekenFracties = verstrekenTijd / 5
+        val restFracties = fractiesInt - verstrekenFracties
+
+        return if (
+            check == "checked" &&
+            verstrekenFracties < fractiesInt &&
+            verstrekenFracties > laatst_verstrekte_SMBfractie
+        ) {
+            laatst_verstrekte_SMBfractie = verstrekenFracties
+            val extraSMB = insulineFloat / fractiesInt
+            Bolus_SMB(true, extraSMB, restFracties - 1)
         } else {
-
-            Bolus_SMB(false, 0.0f, 0.0f)
+            Bolus_SMB(false, 0.0f, 0)
         }
     }  */
+
+
 
     fun getCurrentWeekId(): String {
         val now = java.util.Calendar.getInstance()
@@ -962,7 +980,9 @@ class DetermineBasalSMB @Inject constructor(
         // TODO eliminate
         val deliverAt = currentTime
 
-        if (bolus_SMB_AanUit) {
+
+
+     /*   if (bolus_SMB_AanUit) {
 
             rT.reason.append("=> Insuline via SMB:  $ExtraSMB eh per keer. nog $rest_aantalSMB keer resterend")
 
@@ -972,7 +992,7 @@ class DetermineBasalSMB @Inject constructor(
             rT.units = ExtraSMB.toDouble()
             return rT
         }
-
+*/
 
 
         // TODO eliminate
@@ -1069,7 +1089,7 @@ class DetermineBasalSMB @Inject constructor(
         consoleLog(log_persistent)
         consoleLog(log_stappen)
         consoleLog(log_ExtraIns)
-        consoleLog("pomp basaal" + pomp)
+
 
 
 
@@ -1527,6 +1547,21 @@ class DetermineBasalSMB @Inject constructor(
             // set eventualBG based on COB or UAM predBGs
             rT.eventualBG = eventualBG
         }
+
+
+        if (bolus_SMB_AanUit) {
+
+            rT.reason.append("=> Insuline via SMB:  $ExtraSMB eh per keer. nog $rest_aantalSMB keer resterend")
+
+            rT.deliverAt = deliverAt
+            rT.duration = 30
+            rT.rate = 0.0
+            rT.units = ExtraSMB.toDouble()
+            return rT
+        }
+
+
+
 
         consoleError("UAM Impact: $uci mg/dL per 5m; UAM Duration: $UAMduration hours")
         consoleLog("EventualBG is $eventualBG ;")
