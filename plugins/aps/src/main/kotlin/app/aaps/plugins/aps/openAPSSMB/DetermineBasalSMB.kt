@@ -54,7 +54,7 @@ data class Resistentie_class(val resistentie: Double, val log: String)
 data class Stappen_class(val StapPercentage: Float,val StapTarget: Float, val log: String)
 data class Persistent_class(val PercistentPercentage: Double, val log: String)
 data class UAMBoost_class(val UAMBoostPercentage: Double, val log: String)
-data class Bolus_Basaal(val BolusViaBasaal: Boolean, val BasaalStand: Float , val ResterendeTijd: Float)
+data class Bolus_Basaal(val BolusViaBasaal: Boolean, val BasaalStand: Float ,val ExtraSMB: Float, val ResterendeTijd: Float)
 data class Extra_Insuline(val ExtraIns_AanUit: Boolean, val ExtraIns_waarde: Double ,val log: String)
 
 class DetermineBasalSMB @Inject constructor(
@@ -811,7 +811,9 @@ class DetermineBasalSMB @Inject constructor(
         return Extra_Insuline(extra_insuline,cf,log_ExtraIns)
     }
 
-    fun BolusViaBasaal(): Bolus_Basaal {
+    fun BolusViaBasaal(profile: OapsProfile): Bolus_Basaal {
+
+        val pomp = activePlugin.activePump.pumpDescription.tempBasalStyle  //1 bij procent en 2 bij absoluut
 
         val tijdNu = System.currentTimeMillis()/(60 * 1000)
         var bolus_basaal_check = "0"
@@ -820,8 +822,8 @@ class DetermineBasalSMB @Inject constructor(
         var insuline = "0"
 
 
-        val temp_basaal: Float
-
+        var temp_basaal: Float
+        var Extra_smb: Float
 
         try {
             val sc = Scanner(BolusViaBasaal)
@@ -842,38 +844,29 @@ class DetermineBasalSMB @Inject constructor(
         val rest_tijd = bolus_basaal_tijd.toInt() - verstreken_tijd_bolus
         if (verstreken_tijd_bolus <= ((bolus_basaal_tijd.toInt())+1) && bolus_basaal_check == "checked") {
             bolus_via_basaal = true
-            temp_basaal = insuline.toFloat() * 60 / bolus_basaal_tijd.toFloat()
+            if (pomp == 2) {
+             temp_basaal = insuline.toFloat() * 60 / bolus_basaal_tijd.toFloat()
+             Extra_smb = 0.0f
+             } else {
 
+             temp_basaal = (profile.current_basal * 5).toFloat()
+             val ins_via_basaal = temp_basaal * bolus_basaal_tijd.toInt() / 60
+             val rest_insuline = insuline.toFloat() - ins_via_basaal
+             val aantal_smb = (bolus_basaal_tijd.toInt() /5).toInt()
+             Extra_smb = rest_insuline / aantal_smb
+             }
         } else {
             bolus_via_basaal = false
             temp_basaal = 0.0f
+            Extra_smb = 0.0f
         }
 
 
 
-        return Bolus_Basaal(bolus_via_basaal,temp_basaal,rest_tijd.toFloat())
+        return Bolus_Basaal(bolus_via_basaal,temp_basaal,Extra_smb,rest_tijd.toFloat())
 
     }
-/*
-    fun log_uam(Bg:Double, IOB:Double, D15:Double, D15_oud:Double, perc:Int, Opm:String) {
 
-        val dateStr = dateUtil.dateAndTimeString(dateUtil.now()).toString()
-        val BgStr = round(Bg,1).toString()
-        val iobStr = round(IOB,2).toString()
-        val delta15Str = round(D15/18,1).toString()
-        val delta15oudStr = round(D15_oud/18,1).toString()
-        val UAMPercStr = perc.toString()
-
-        val headerRow = "datum, bg, iob, delta15, delta15oud, Bgperc, opm.\n"
-        val valuesToRecord = "$dateStr, $BgStr, $iobStr, $delta15Str, $delta15oudStr, $UAMPercStr, $Opm"
-
-        if (!csvfile.exists()) {
-            csvfile.createNewFile()
-            csvfile.appendText(headerRow)
-        }
-        csvfile.appendText(valuesToRecord + "\n")
-
-    }  */
 
     fun getCurrentWeekId(): String {
         val now = java.util.Calendar.getInstance()
@@ -938,7 +931,7 @@ class DetermineBasalSMB @Inject constructor(
             consoleError = consoleError
         )
 
-        val (bolus_basaal_AanUit,bolus_basaal_waarde, rest_tijd_basaal) = BolusViaBasaal()
+        val (bolus_basaal_AanUit,bolus_basaal_waarde,ExtraSMB, rest_tijd_basaal) = BolusViaBasaal(profile)
         val (extraIns_AanUit,extraIns_Factor,log_ExtraIns) = ActExtraIns()
 
 
@@ -953,9 +946,11 @@ class DetermineBasalSMB @Inject constructor(
             // consoleError.add(" ﴿―――――――――――――――﴾")
 
             rT.reason.append("=> Insuline via basaal:  $bolus_basaal_waarde u/h nog $rest_tijd_basaal minuten resterend")
+            rT.reason.append("=> Extra SMB:  $ExtraSMB eh")
             rT.deliverAt = deliverAt
             rT.duration = 30
             rT.rate = new_basaal
+            rT.units = ExtraSMB.toDouble()
             return rT
         }
 
@@ -1048,11 +1043,14 @@ class DetermineBasalSMB @Inject constructor(
         val (persistent_factor,log_persistent) = Persistent()
         val (stap_perc,stap_target,log_stappen) = Stappen()
 
+
+        val pomp = activePlugin.activePump.pumpDescription.tempBasalStyle.toString()  //1 bij procent en 2 bij absoluut
         consoleLog(log_res)
         consoleLog(log_uam)
         consoleLog(log_persistent)
         consoleLog(log_stappen)
         consoleLog(log_ExtraIns)
+        consoleLog("pomp basaal" + pomp)
 
 
 
