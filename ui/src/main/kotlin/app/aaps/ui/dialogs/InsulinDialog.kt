@@ -63,6 +63,7 @@ import kotlin.math.max
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.pow
 
 class InsulinDialog : DialogFragmentWithDate() {
 
@@ -88,7 +89,7 @@ class InsulinDialog : DialogFragmentWithDate() {
     private var _binding: DialogInsulinBinding? = null
     private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
     private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
-    private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
+    private val BolusViaSMB = File(externalDir, "ANALYSE/Bolus-via-smb.txt")
     private val BolusOverzicht = File(externalDir, "ANALYSE/BolusOverzicht.txt")
 
 
@@ -247,7 +248,7 @@ class InsulinDialog : DialogFragmentWithDate() {
 
         // Eigen input
         val extraInsulineChecked = binding.activeerExtraInsuline.isChecked
-        val bolusviabasaalChecked = binding.bolusViaBasaal.isChecked
+        val bolusviasmbChecked = binding.bolusViaSmb.isChecked
         val alleenBoostChecked = binding.geenBolus.isChecked
         val StopBolusChecked = binding.stopBolus.isChecked
         val aantalSMB = (binding.aantalsmb.value.toInt()).toString()
@@ -279,25 +280,26 @@ class InsulinDialog : DialogFragmentWithDate() {
             insulinAfterConstraints = constraintChecker.applyBolusConstraints(ConstraintObject(insulin, aapsLogger)).value()
         }
 
-        if (!BolusViaBasaal.parentFile.exists()) {
-            BolusViaBasaal.parentFile.mkdirs()
+        if (!BolusViaSMB.parentFile.exists()) {
+            BolusViaSMB.parentFile.mkdirs()
         }
 
 
-        if (bolusviabasaalChecked && insulin > 0.0) {
+        if (bolusviasmbChecked && insulin > 0.0) {
             insulin = 0.0
             insulinAfterConstraints = 0.0
 
-            BolusViaBasaal.writeText("checked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
+            BolusViaSMB.writeText("checked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
             val opmerking = binding.editTextInput.text.toString()
             schrijfBolusOverzicht(insuline, opmerking)
         } else {
-            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
+            BolusViaSMB.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
         }
 
         if (StopBolusChecked) {
-            BolusViaBasaal.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
+            BolusViaSMB.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
         }
+        val eh_per_smb = round(insuline.toDouble()/aantalSMB.toDouble(),2).toString()
 // Einde eigen input
 
 
@@ -391,9 +393,9 @@ class InsulinDialog : DialogFragmentWithDate() {
             }
         } else {
 
-            if (bolusviabasaalChecked && !alleenBoostChecked && !StopBolusChecked) {
+            if (bolusviasmbChecked && !alleenBoostChecked && !StopBolusChecked) {
                 activity?.let { activity ->
-                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " $insuline eh bolus wordt gegeven via $aantalSMB smb's ")
+                    OKDialog.show(activity, rh.gs(app.aaps.core.ui.R.string.bolus), " $insuline eh bolus wordt gegeven via $aantalSMB smb's van $eh_per_smb eh per smb")
                 }
             } else {
                 if (alleenBoostChecked || StopBolusChecked) {
@@ -415,6 +417,12 @@ class InsulinDialog : DialogFragmentWithDate() {
             }
         }
         return true
+    }
+
+    fun round(value: Double, digits: Int): Double {
+        if (value.isNaN()) return Double.NaN
+        val scale = 10.0.pow(digits.toDouble())
+        return Math.round(value * scale) / scale
     }
 
     fun schrijfBolusOverzicht( insuline: String, opm: String) {

@@ -15,6 +15,7 @@ import app.aaps.core.interfaces.aps.Predictions
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.logging.L
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
@@ -73,7 +74,8 @@ class DetermineBasalSMB @Inject constructor(
     private var StapRetentie: Int = 0
     private val externalDir = File(Environment.getExternalStorageDirectory().absolutePath + "/Documents/AAPS/")
     private val ActExtraIns = File(externalDir, "ANALYSE/Act-extra-ins.txt")
-    private val BolusViaBasaal = File(externalDir, "ANALYSE/Bolus-via-basaal.txt")
+    private val Bolus_SMB = File(externalDir, "ANALYSE/Bolus-via-smb.txt")
+    private val LaatsteSMBFractie = File(externalDir, "ANALYSE/laatsteSMBFractie.txt")
    // private val csvfile = File(externalDir, "ANALYSE/analyse.csv")
     private val consoleError = mutableListOf<String>()
     private val consoleLog = mutableListOf<String>()
@@ -813,8 +815,8 @@ class DetermineBasalSMB @Inject constructor(
         return Extra_Insuline(extra_insuline,cf,log_ExtraIns)
     }
 
-    fun BolusViaSMB(): Bolus_SMB {
 
+    fun BolusViaSMB(): Bolus_SMB {
         val tijdNu = System.currentTimeMillis() / (60 * 1000)
         var bolus_basaal_check = "0"
         var bolus_basaal_tijdstip = "0"
@@ -822,90 +824,86 @@ class DetermineBasalSMB @Inject constructor(
         var insuline = "0"
 
         try {
-            val sc = Scanner(BolusViaBasaal)
+            val sc = Scanner(Bolus_SMB)
             var teller = 1
             while (sc.hasNextLine()) {
                 val line = sc.nextLine()
-                if (teller == 1) bolus_basaal_check = line
-                if (teller == 2) bolus_basaal_tijdstip = line
-                if (teller == 3) aantal_fracties = line
-                if (teller == 4) insuline = line
+                when (teller) {
+                    1 -> bolus_basaal_check = line
+                    2 -> bolus_basaal_tijdstip = line
+                    3 -> aantal_fracties = line
+                    4 -> insuline = line
+                }
                 teller += 1
             }
         } catch (e: IOException) {
             e.printStackTrace()
         }
-        if (bolus_basaal_tijdstip.toInt() != vorige_bolus_tijdstip) {
-            laatst_verstrekte_SMBfractie = -1
-            vorige_bolus_tijdstip = bolus_basaal_tijdstip.toInt()
+
+        val totaal_fracties = aantal_fracties.toInt()
+
+        // Eerst controleren of dit een nieuwe bolusopdracht is
+        val opgeslagenTijdstip = leesLaatsteFractie().first
+        if (bolus_basaal_tijdstip.toInt() != opgeslagenTijdstip) {
+            schrijfLaatsteFractie(bolus_basaal_tijdstip.toInt(), -1)
         }
+
+        // Pas hierna lezen van teller/fractie
+        val (herladenTijdstip, laatstFractie) = leesLaatsteFractie()
+        val huidigeFractie = laatstFractie + 1
+        val rest_fracties = totaal_fracties - huidigeFractie
 
         val fractie_duur = 5
-        val verstreken_tijd_bolus = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
-        val verstreken_fracties = verstreken_tijd_bolus / fractie_duur
-        val totaal_fracties = aantal_fracties.toInt()
-        val rest_fracties = totaal_fracties - verstreken_fracties
+        val verstreken_minuten = tijdNu.toInt() - bolus_basaal_tijdstip.toInt()
+        val theoretische_fractie = verstreken_minuten / fractie_duur
+
+        val fractie_aan_de_beurt = (
+            (huidigeFractie == 0 && verstreken_minuten >= 0) ||
+                (huidigeFractie > 0 && huidigeFractie <= theoretische_fractie)
+            )
 
         return if (
-            verstreken_fracties < totaal_fracties &&
             bolus_basaal_check == "checked" &&
-            verstreken_fracties > laatst_verstrekte_SMBfractie
+            huidigeFractie < totaal_fracties &&
+            fractie_aan_de_beurt
         ) {
-            laatst_verstrekte_SMBfractie = verstreken_fracties
+            schrijfLaatsteFractie(bolus_basaal_tijdstip.toInt(), huidigeFractie)
             val Extra_smb = insuline.toFloat() / totaal_fracties
-            val adjusted_rest_fracties = rest_fracties - 1
-            Bolus_SMB(true, Extra_smb, adjusted_rest_fracties)
+            Bolus_SMB(true, Extra_smb, rest_fracties - 1)
         } else {
-            Bolus_SMB(false, 0.0f, 0)
+            Bolus_SMB(false, 0.0f, rest_fracties)
         }
-
-
     }
-   /* fun BolusViaSMB(): Bolus_SMB {
-        val tijdNuMinuten = System.currentTimeMillis() / (60 * 1000)
 
-        var check = "0"
-        var tijdstip = "0"
-        var fracties = "0"
-        var insuline = "0"
 
-        try {
-            Scanner(BolusViaBasaal).use { sc ->
-                if (sc.hasNextLine()) check = sc.nextLine()
-                if (sc.hasNextLine()) tijdstip = sc.nextLine()
-                if (sc.hasNextLine()) fracties = sc.nextLine()
-                if (sc.hasNextLine()) insuline = sc.nextLine()
+
+    fun leesLaatsteFractie(): Pair<Int, Int> {
+        return try {
+            if (LaatsteSMBFractie.exists()) {
+                val regels = LaatsteSMBFractie.readLines()
+                if (regels.size >= 2) {
+                    val opgeslagenTijdstip = regels[0].toInt()
+                    val laatsteFractie = regels[1].toInt()
+                    Pair(opgeslagenTijdstip, laatsteFractie)
+                } else {
+                    Pair(-1, -1)
+                }
+            } else {
+                Pair(-1, -1)
             }
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            Pair(-1, -1)
+        }
+    }
+
+    fun schrijfLaatsteFractie(tijdstip: Int, fractie: Int) {
+        try {
+            LaatsteSMBFractie.writeText("$tijdstip\n$fractie")
+        } catch (e: Exception) {
             e.printStackTrace()
-            return Bolus_SMB(false, 0.0f, 0)
         }
+    }
 
-        val tijdstipInt = tijdstip.toIntOrNull() ?: return Bolus_SMB(false, 0.0f, 0)
-        val fractiesInt = fracties.toIntOrNull()?.coerceAtLeast(1) ?: return Bolus_SMB(false, 0.0f, 0)
-        val insulineFloat = insuline.toFloatOrNull() ?: return Bolus_SMB(false, 0.0f, 0)
-
-        if (tijdstipInt != vorige_bolus_tijdstip) {
-            laatst_verstrekte_SMBfractie = -1
-            vorige_bolus_tijdstip = tijdstipInt
-        }
-
-        val verstrekenTijd = (tijdNuMinuten - tijdstipInt).toInt()
-        val verstrekenFracties = verstrekenTijd / 5
-        val restFracties = fractiesInt - verstrekenFracties
-
-        return if (
-            check == "checked" &&
-            verstrekenFracties < fractiesInt &&
-            verstrekenFracties > laatst_verstrekte_SMBfractie
-        ) {
-            laatst_verstrekte_SMBfractie = verstrekenFracties
-            val extraSMB = insulineFloat / fractiesInt
-            Bolus_SMB(true, extraSMB, restFracties - 1)
-        } else {
-            Bolus_SMB(false, 0.0f, 0)
-        }
-    }  */
 
 
 
@@ -2116,7 +2114,7 @@ class DetermineBasalSMB @Inject constructor(
         val maxWaveSMBBasalMinutes = preferences.get(IntKey.ApsWaveMaxMinutesOfBasalToLimitSmb)
         val waveUseSMBCap = preferences.get(BooleanKey.ApsWaveUseSMBCap)
         val waveSMBCap = preferences.get(DoubleKey.ApsWaveSmbCap)
-        val waveUseAdjustedSens = preferences.get(BooleanKey.ApsWaveUseAdjustedSens)
+        val waveUseAdjustedSens = false //preferences.get(BooleanKey.ApsWaveUseAdjustedSens)
         // val waveSMBCapScaling = sp.getBoolean(R.string.key_wave_SMB_scaling, false) // Leave for now
 
         var insulinReqPCT = waveInsReqPct / 100.0
@@ -2135,18 +2133,7 @@ class DetermineBasalSMB @Inject constructor(
             return TsunamiResult(0.0, 0.0, false, StringBuilder())
         }
 
-        //     val currentHour = LocalTime.now().hour
-        //     var referenceTimer = currentHour.toDouble()
-        // active hours redefinition (allowing end times < start times)
-        //     if (endTime < startTime) {
-        //         referenceTimer = if (currentHour < startTime) {
-        //             currentHour - startTime + 24 //MP: Transformed timer, counting from (24 - startTime) until 23
-        //         } else {
-        //             currentHour - startTime //MP: Transformed timer, counting from 0 until (23 - startTime)
-        //         }
-        //         endTime = 24 - (startTime - endTime) //MP: Transformed end hour, represents total duration of active hours in hours
-        //         startTime = 0.0 //MP: Set starting hour to 0 and transform the rest
-        //     }
+
 
         var SMBcap = if (waveUseSMBCap) {
             waveSMBCap

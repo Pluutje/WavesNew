@@ -623,7 +623,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveUseSMBCap, summary = R.string.use_wave_smbcap_summary, title = R.string.use_wave_smbcap_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsWaveSmbCap, dialogMessage = R.string.wave_smbcap_message, title = R.string.wave_smbcap_title))
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsWaveMaxMinutesOfBasalToLimitSmb, dialogMessage = R.string.wave_smb_max_minutes, title = R.string.wave_smb_max_minutes_summary))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveUseAdjustedSens, summary = R.string.wave_use_adjusted_sens_summary, title = R.string.wave_use_adjusted_sens_title))
+            //    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsWaveUseAdjustedSens, summary = R.string.wave_use_adjusted_sens_summary, title = R.string.wave_use_adjusted_sens_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsWaveInsReqPct, dialogMessage = R.string.wave_insulinReqPCT_message, title = R.string.wave_insulinReqPCT_title))
             })
 

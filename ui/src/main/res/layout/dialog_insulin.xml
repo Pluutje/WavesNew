@@ -52,7 +52,7 @@
             android:padding="5dp">
 
             <CheckBox
-                android:id="@+id/bolus_via_basaal"
+                android:id="@+id/bolus_via_smb"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:checked="true"
