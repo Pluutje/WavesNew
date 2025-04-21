@@ -291,7 +291,7 @@ class InsulinDialog : DialogFragmentWithDate() {
 
             BolusViaSMB.writeText("checked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
             val opmerking = binding.editTextInput.text.toString()
-            schrijfBolusOverzicht(insuline, opmerking)
+            schrijfBolusOverzicht(insuline, aantalSMB, opmerking)
         } else {
             BolusViaSMB.writeText("unchecked" + "\n" + tijdNu + "\n" + aantalSMB + "\n" + insuline)
         }
@@ -425,10 +425,11 @@ class InsulinDialog : DialogFragmentWithDate() {
         return Math.round(value * scale) / scale
     }
 
-    fun schrijfBolusOverzicht( insuline: String, opm: String) {
+    fun schrijfBolusOverzicht( insuline: String, aantalSMB: String, opm: String) {
         val kopregel = " Datum     Tijd  -  Bolus"
         val tijdact = getFormattedTime()
-        val nieuweRegel = "$tijdact - $insuline eh\n  opm: $opm"
+        val InsPerSMB = round(insuline.toDouble()/aantalSMB.toDouble(),2).toString()
+        val nieuweRegel = "$tijdact - $insuline eh in $aantalSMB * $InsPerSMB eh\n  opm: $opm"
 
         val file = BolusOverzicht
 

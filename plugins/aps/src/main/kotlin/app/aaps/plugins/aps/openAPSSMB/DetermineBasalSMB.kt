@@ -730,7 +730,7 @@ class DetermineBasalSMB @Inject constructor(
         val Pers_grensL = (preferences.get(DoubleKey.persistent_grens) * 18) - extraNachtrange
         val Pers_grensH = (preferences.get(DoubleKey.persistent_grens) * 18) + 2 + extraNachtrange
 
-        if (delta5>-Pers_grensL && delta5<Pers_grensH && delta15>-Pers_grensL-1 && delta15<Pers_grensH+1 && delta30>-Pers_grensL-2 && delta30<Pers_grensH+2 && bg_act > Persistent_Drempel) {
+        if (delta5>-Pers_grensL && delta5<Pers_grensH && delta15>-Pers_grensL-2 && delta15<Pers_grensH+2 && delta30>-Pers_grensL-4 && delta30<Pers_grensH+4 && bg_act > Persistent_Drempel) {
             Persistent_ISF_perc = (((bg_act - Persistent_Drempel ) / 10.0) + 1.0) * 100 * 1.05
             Persistent_ISF_perc = Persistent_ISF_perc.coerceIn(100.0, Max_Persistent_perc.toDouble())
             Display_Persistent_perc = Persistent_ISF_perc.toInt()
@@ -980,18 +980,6 @@ class DetermineBasalSMB @Inject constructor(
 
 
 
-     /*   if (bolus_SMB_AanUit) {
-
-            rT.reason.append("=> Insuline via SMB:  $ExtraSMB eh per keer. nog $rest_aantalSMB keer resterend")
-
-            rT.deliverAt = deliverAt
-            rT.duration = 30
-            rT.rate = 0.0
-            rT.units = ExtraSMB.toDouble()
-            return rT
-        }
-*/
-
 
         // TODO eliminate
         val profile_current_basal = round_basal(profile.current_basal)
@@ -1089,39 +1077,47 @@ class DetermineBasalSMB @Inject constructor(
         consoleLog(log_ExtraIns)
 
 
-
-
-        if (high_temptarget_raises_sensitivity && profile.temptargetSet && target_bg > normalTarget
-            || profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && target_bg < normalTarget
-        ) {
-            // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
-            // e.g.: Sensitivity ratio set to 0.8 based on temp target of 120; Adjusting basal from 1.65 to 1.35; ISF from 58.9 to 73.6
-            //sensitivityRatio = 2/(2+(target_bg-normalTarget)/40);
-            val c = (halfBasalTarget - normalTarget).toDouble()
-            sensitivityRatio = c / (c + target_bg - normalTarget)
-            // limit sensitivityRatio to profile.autosens_max (1.2x by default)
-            sensitivityRatio = min(sensitivityRatio, profile.autosens_max)
-            sensitivityRatio = round(sensitivityRatio, 2)
-            consoleLog("Sensitivity ratio set to $sensitivityRatio based on temp target of $target_bg; ")
-        } else {
-            sensitivityRatio = autosens_data.ratio
-            //   consoleLog("Autosens ratio: $sensitivityRatio; ")
-        }
-
         sensitivityRatio = resistentie_factor
 
+     //   var sens_factor = 1.0
+     //   var basaal_factor = 1.0
+        var cf_factor_overall = 1.0
+
+        if (preferences.get(BooleanKey.Resistentie)) {
+     //       sens_factor *= resistentie_factor
+     //       basaal_factor *= resistentie_factor
+            cf_factor_overall *= resistentie_factor
+               }
+        if (extraIns_AanUit) {
+    //        sens_factor *= extraIns_Factor
+    //        basaal_factor *= extraIns_Factor
+            cf_factor_overall *= extraIns_Factor
+               }
+        if (preferences.get(BooleanKey.stappenAanUit)) {
+    //        sens_factor *= (stap_perc/100)
+    //        basaal_factor *= (stap_perc/100)
+            cf_factor_overall *= (stap_perc/100)
+              }
+        if (preferences.get(BooleanKey.PersistentAanUit)) {
+    //        sens_factor *= persistent_factor
+    //        basaal_factor *= persistent_factor
+            cf_factor_overall *= persistent_factor
+            }
+        if (preferences.get(BooleanKey.uamBoost)) {
+    //        sens_factor *= (UAM_boost_perc/100)
+    //        basaal_factor *= (UAM_boost_perc/100)
+            cf_factor_overall *= (UAM_boost_perc/100)
+            }
 
 
-        basal = profile.current_basal * sensitivityRatio
+
+        basal = profile.current_basal * cf_factor_overall // sensitivityRatio
         basal = round_basal(basal)
         val txtProfileBasal = round(profile_current_basal,2)
         val txtBasal = round(basal,2)
-        if (basal != profile_current_basal)
-            consoleLog("Basaal van $txtProfileBasal naar $txtBasal; ")
-        else
-            consoleLog("Basaal onveranderd: $basal; ")
 
-        // adjust min, max, and target BG for sensitivity, such that 50% increase in ISF raises target from 100 to 120
+
+
         if (profile.temptargetSet) {
             //console.log("Temp Target set, not adjusting with autosens; ");
         } else {
@@ -1143,11 +1139,6 @@ class DetermineBasalSMB @Inject constructor(
         target_bg += stap_target
 
 
-
-
-
-
-
         val tick: String
 
         tick = if (glucose_status.delta > -0.5) {
@@ -1159,36 +1150,14 @@ class DetermineBasalSMB @Inject constructor(
         val minAvgDelta = min(glucose_status.shortAvgDelta, glucose_status.longAvgDelta)
         val maxDelta = max(glucose_status.delta, max(glucose_status.shortAvgDelta, glucose_status.longAvgDelta))
 
-        var sens =
-            if (dynIsfMode) profile.variable_sens
-            else {
-                val profile_sens = round(profile.sens, 1)
-                var adjusted_sens = round(profile.sens / sensitivityRatio, 1)
-                if (adjusted_sens != profile_sens) {
-                    consoleLog("ISF van " + round(profile_sens/18,1) + " naar " + round(adjusted_sens/18,1) + "\n")
-                    //    consoleLog("ISF from $profile_sens to $adjusted_sens")
-                } else {
-                    consoleLog("ISF onveranderd: " + round(adjusted_sens/18,1) + "\n")
-                    //    consoleLog("ISF unchanged: $adjusted_sens")
-                }
 
-                adjusted_sens
+        var sens = profile.sens / cf_factor_overall
 
-            }
-        if (extraIns_AanUit) {
-            sens = sens / extraIns_Factor
-        }
-        if (preferences.get(BooleanKey.stappenAanUit)) {
-            sens = sens / (stap_perc/100)
-        }
-        if (preferences.get(BooleanKey.PersistentAanUit)) {
-            sens = sens / (persistent_factor)
-        }
-        if (preferences.get(BooleanKey.uamBoost)) {
-            sens = sens / (UAM_boost_perc/100)
-        }
+        consoleLog("Correctie overall =  " + (cf_factor_overall*100).toInt() + "%")
+        consoleLog("ISF van " + round(profile.sens/18,1) + " naar " + round(sens/18,1))
+        consoleLog("Basaal van $txtProfileBasal naar $txtBasal \n")
 
-        // consoleError("CR:${profile.carb_ratio}")
+
 
         //calculate BG impact: the amount BG "should" be rising or falling based on insulin activity alone
         val bgi = round((-iob_data.activity * sens * 5), 2)
